@@ -4,6 +4,8 @@ import express from "express";
 import { createAgent } from "./agents/createAgent";
 import { AgentPlatform, AIAgent } from "./agents/types";
 import { apiKey, serverClient } from "./serverClient";
+import { LLMFactory } from "./llm/llm-factory";
+import { getMetrics } from "./metrics";
 
 const app = express();
 app.use(express.json());
@@ -34,6 +36,35 @@ app.get("/", (req, res) => {
     apiKey: apiKey,
     activeAgents: aiAgentCache.size,
   });
+});
+
+app.get("/metrics", (req, res) => {
+  try {
+    const snapshot = getMetrics();
+    res.json(snapshot);
+  } catch (error) {
+    console.error("Error getting metrics:", error);
+    res.status(500).json({ error: "Failed to get metrics" });
+  }
+});
+
+app.get("/models", (req, res) => {
+  try {
+    const llmFactory = new LLMFactory();
+    const supportedModels = llmFactory.getSupportedModels();
+    const defaultModel = llmFactory.getDefaultModel();
+    
+    res.json({
+      supportedModels,
+      defaultModel,
+    });
+  } catch (error) {
+    console.error("Error getting models:", error);
+    res.status(500).json({
+      error: "Failed to get supported models",
+      reason: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 });
 
 /**
@@ -67,7 +98,7 @@ app.post("/start-ai-agent", async (req, res) => {
 
       const agent = await createAgent(
         user_id,
-        AgentPlatform.OPENAI,
+        AgentPlatform.LLM,
         channel_type,
         channel_id
       );

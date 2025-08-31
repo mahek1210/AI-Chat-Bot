@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Square, X } from "lucide-react";
+import { ArrowRight, Square, X, Mic } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { WritingPromptsToolbar } from "./writing-prompts-toolbar";
 
@@ -31,6 +31,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = externalTextareaRef || internalTextareaRef;
+  const recognitionRef = useRef<any | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [hasSpeechSupport, setHasSpeechSupport] = useState(true);
 
   const handlePromptSelect = (prompt: string) => {
     // Append the prompt to existing text or set it if empty
@@ -54,6 +57,67 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   useEffect(() => {
     updateTextareaHeight();
   }, [value, updateTextareaHeight]);
+
+  // Detect Web Speech API support
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setHasSpeechSupport(false);
+      return;
+    }
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = true;
+    recognitionRef.current.interimResults = true;
+    recognitionRef.current.lang = navigator.language || "en-US";
+
+    recognitionRef.current.onresult = (event: any) => {
+      let interimTranscript = "";
+      let finalTranscript = value || "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript = (finalTranscript ? finalTranscript + " " : "") + transcript.trim();
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      // Prefer final when available; otherwise show interim appended
+      const nextText = (finalTranscript || value || "") + (interimTranscript ? (finalTranscript ? " " : "") + interimTranscript : "");
+      onValueChange(nextText.trimStart());
+    };
+
+    recognitionRef.current.onerror = () => {
+      setIsRecording(false);
+    };
+
+    recognitionRef.current.onend = () => {
+      setIsRecording(false);
+    };
+  }, []);
+
+  const startRecording = () => {
+    if (!recognitionRef.current || isRecording || isLoading || isGenerating) return;
+    try {
+      recognitionRef.current.start();
+      setIsRecording(true);
+      // Focus input so user sees live transcription
+      textareaRef.current?.focus();
+    } catch (e) {
+      // no-op
+    }
+  };
+
+  const stopRecording = () => {
+    if (!recognitionRef.current || !isRecording) return;
+    try {
+      recognitionRef.current.stop();
+    } catch (e) {
+      // no-op
+    } finally {
+      setIsRecording(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,6 +187,24 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 <X className="h-4 w-4" />
               </Button>
             )}
+
+            {/* Microphone button */}
+            <Button
+              type="button"
+              variant={isRecording ? "destructive" : "ghost"}
+              size="icon"
+              disabled={!hasSpeechSupport || isLoading || isGenerating}
+              onClick={isRecording ? stopRecording : startRecording}
+              className="absolute right-20 bottom-2 h-8 w-8 rounded-md text-muted-foreground hover:text-foreground disabled:opacity-40"
+              title={hasSpeechSupport ? (isRecording ? "Stop recording" : "Start voice input") : "Voice input not supported"}
+            >
+              <div className="relative">
+                <Mic className="h-4 w-4" />
+                {isRecording && (
+                  <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-red-500" />
+                )}
+              </div>
+            </Button>
 
             {/* Send/Stop Button inside textarea */}
             {isGenerating ? (

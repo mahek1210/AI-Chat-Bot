@@ -1,4 +1,5 @@
 import { useAIAgentStatus } from "@/hooks/use-ai-agent-status";
+import { useModel } from "@/contexts/model-context";
 import {
   Bot,
   Briefcase,
@@ -21,8 +22,11 @@ import {
 import { AIAgentControl } from "./ai-agent-control";
 import { ChatInput, ChatInputProps } from "./chat-input";
 import ChatMessage from "./chat-message";
+import { ModelSelector } from "./model-selector";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { BarChart2 } from "lucide-react";
 
 interface ChatInterfaceProps {
   onToggleSidebar: () => void;
@@ -194,17 +198,35 @@ const MessageListEmptyIndicator = () => (
 );
 
 const MessageListContent = () => {
-  const { messages, thread } = useChannelStateContext();
+  const { messages, thread, channel } = useChannelStateContext();
   const isThread = !!thread;
+  const { aiState } = useAIState(channel);
 
   if (isThread) return null;
 
+  const isThinking =
+    aiState === "AI_STATE_THINKING" ||
+    aiState === "AI_STATE_GENERATING" ||
+    aiState === "AI_STATE_EXTERNAL_SOURCES";
+
   return (
-    <div className="flex-1 min-h-0">
+    <div className="flex-1 min-h-0 flex flex-col">
       {!messages?.length ? (
         <MessageListEmptyIndicator />
       ) : (
-        <MessageList Message={ChatMessage} />
+        <>
+          <MessageList Message={ChatMessage} />
+          {isThinking && (
+            <div className="px-4 py-2 text-xs text-muted-foreground flex items-center gap-2">
+              <span>🤔 AI is thinking...</span>
+              <div className="flex space-x-1">
+                <span className="w-1 h-1 bg-current rounded-full animate-pulse" />
+                <span className="w-1 h-1 bg-current rounded-full animate-pulse [animation-delay:150ms]" />
+                <span className="w-1 h-1 bg-current rounded-full animate-pulse [animation-delay:300ms]" />
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -225,6 +247,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     const { sendMessage } = useChannelActionContext();
     const { channel, messages } = useChannelStateContext();
     const { aiState } = useAIState(channel);
+    const { selectedModel } = useModel();
     const [inputText, setInputText] = useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -250,9 +273,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       }
     };
 
+    const handleSendMessage = async (message: { text: string }) => {
+      // Include the selected model in the message custom field
+      await sendMessage({
+        ...message,
+        custom: {
+          model: selectedModel,
+        },
+      });
+    };
+
     return (
       <ChatInput
-        sendMessage={sendMessage}
+        sendMessage={handleSendMessage}
         value={inputText}
         onValueChange={setInputText}
         textareaRef={textareaRef}
@@ -296,16 +329,20 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </div>
           </div>
         </div>
-        {channel?.id && (
-          <AIAgentControl
-            status={agentStatus.status}
-            loading={agentStatus.loading}
-            error={agentStatus.error}
-            toggleAgent={agentStatus.toggleAgent}
-            checkStatus={agentStatus.checkStatus}
-            channelId={channel.id}
-          />
-        )}
+        <div className="flex items-center gap-2">
+          <ModelSelector />
+          <MetricsDialog backendUrl={backendUrl} />
+          {channel?.id && (
+            <AIAgentControl
+              status={agentStatus.status}
+              loading={agentStatus.loading}
+              error={agentStatus.error}
+              toggleAgent={agentStatus.toggleAgent}
+              checkStatus={agentStatus.checkStatus}
+              channelId={channel.id}
+            />
+          )}
+        </div>
       </header>
 
       {/* Main Content */}
@@ -322,5 +359,75 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         )}
       </div>
     </div>
+  );
+};
+
+const MetricsDialog: React.FC<{ backendUrl: string }> = ({ backendUrl }) => {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<{
+    totalRequests: number;
+    avgLatency: number;
+    totalTokens: number;
+    totalCostUSD: number;
+    requestsByModel: Record<string, number>;
+  } | null>(null);
+
+  const fetchMetrics = async () => {
+    if (!backendUrl) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch(`${backendUrl}/metrics`);
+      if (!res.ok) throw new Error(`${res.status}`);
+      const json = await res.json();
+      setData(json);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) fetchMetrics(); }}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 gap-2">
+          <BarChart2 className="h-3 w-3" />
+          <span>Stats</span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Aggregate Metrics</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        ) : error ? (
+          <div className="text-sm text-red-500">Error: {error}</div>
+        ) : data ? (
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between"><span>Total requests</span><span>{data.totalRequests}</span></div>
+            <div className="flex justify-between"><span>Avg latency</span><span>{data.avgLatency} ms</span></div>
+            <div className="flex justify-between"><span>Total tokens</span><span>{data.totalTokens}</span></div>
+            <div className="flex justify-between"><span>Total cost</span><span>${(data.totalCostUSD ?? 0).toFixed(4)}</span></div>
+            <div>
+              <div className="font-medium mb-1">Requests by model</div>
+              <div className="grid grid-cols-1 gap-1">
+                {Object.entries(data.requestsByModel || {}).map(([model, count]) => (
+                  <div key={model} className="flex justify-between"><span>{model}</span><span>{count}</span></div>
+                ))}
+                {Object.keys(data.requestsByModel || {}).length === 0 && (
+                  <div className="text-muted-foreground">No data yet</div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-muted-foreground">No data</div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 };

@@ -1,8 +1,8 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Bot, Check, Copy } from "lucide-react";
-import React, { useState } from "react";
+import { Bot, Check, Copy, Square, Volume2 } from "lucide-react";
+import React, { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import {
   useAIState,
@@ -24,6 +24,8 @@ const ChatMessage: React.FC = () => {
 
   const isUser = !message.user?.id?.startsWith("ai-bot");
   const [copied, setCopied] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const copyToClipboard = async () => {
     if (streamedMessageText) {
@@ -31,6 +33,39 @@ const ChatMessage: React.FC = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const toggleSpeak = () => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+
+    if (speaking) {
+      try {
+        synth.cancel();
+      } finally {
+        setSpeaking(false);
+      }
+      return;
+    }
+
+    const text = streamedMessageText || message.text || "";
+    if (!text.trim()) return;
+
+    // Stop any ongoing speech before starting this one
+    synth.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onend = () => {
+      setSpeaking(false);
+      utteranceRef.current = null;
+    };
+    utterance.onerror = () => {
+      setSpeaking(false);
+      utteranceRef.current = null;
+    };
+    utteranceRef.current = utterance;
+    setSpeaking(true);
+    synth.speak(utterance);
   };
 
   const getAiStateMessage = () => {
@@ -51,6 +86,28 @@ const ChatMessage: React.FC = () => {
   const formatTime = (timestamp: string | Date) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const renderUsage = () => {
+    if (isUser) return null;
+    const usage = (message as any)?.custom?.usage as
+      | {
+          promptTokens?: number;
+          completionTokens?: number;
+          totalTokens?: number;
+          costUSD?: number;
+          latencyMs?: number;
+        }
+      | undefined;
+    if (!usage) return null;
+    const totalTokens = usage.totalTokens ?? 0;
+    const cost = typeof usage.costUSD === "number" ? `$${usage.costUSD.toFixed(4)}` : "-";
+    const latency = typeof usage.latencyMs === "number" ? `${(usage.latencyMs / 1000).toFixed(1)}s` : "-";
+    return (
+      <div className="mt-1 text-[11px] text-muted-foreground/80">
+        Tokens: {totalTokens} | Cost: {cost} | Latency: {latency}
+      </div>
+    );
   };
 
   return (
@@ -155,6 +212,8 @@ const ChatMessage: React.FC = () => {
               </ReactMarkdown>
             </div>
 
+            {renderUsage()}
+
             {/* Loading State */}
             {aiState && !streamedMessageText && !message.text && (
               <div className="flex items-center gap-2 mt-2 pt-2">
@@ -178,8 +237,28 @@ const ChatMessage: React.FC = () => {
             </span>
 
             {/* Actions - Only for AI messages, always right aligned */}
-            {!isUser && !!streamedMessageText && (
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            {!isUser && !!(streamedMessageText || message.text) && (
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleSpeak}
+                  className="h-6 px-2 text-xs hover:bg-muted rounded-md"
+                  title={speaking ? "Stop" : "Listen"}
+                >
+                  {speaking ? (
+                    <>
+                      <Square className="h-3 w-3 mr-1" />
+                      <span>Stop</span>
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="h-3 w-3 mr-1" />
+                      <span>Listen</span>
+                    </>
+                  )}
+                </Button>
+
                 <Button
                   variant="ghost"
                   size="sm"
