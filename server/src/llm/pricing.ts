@@ -10,6 +10,18 @@ export const PRICING_TABLE: Record<string, PricingEntry> = {
   'gpt-4o': { inputPer1K: 0.005, outputPer1K: 0.015 },
   'gpt-4o-mini': { inputPer1K: 0.00015, outputPer1K: 0.0006 },
 
+  // Google Gemini
+  'gemini-1.5-flash': { inputPer1K: 0.000075, outputPer1K: 0.0003 },
+  'gemini-1.5-pro': { inputPer1K: 0.00375, outputPer1K: 0.015 },
+  'gemini-1.0-pro': { inputPer1K: 0.0005, outputPer1K: 0.0015 },
+  'gemini-1.0-pro-vision': { inputPer1K: 0.0005, outputPer1K: 0.0015 },
+
+  // Anthropic Claude (Direct)
+  'claude-3-5-sonnet-20241022': { inputPer1K: 0.003, outputPer1K: 0.015 },
+  'claude-3-opus-20240229': { inputPer1K: 0.015, outputPer1K: 0.075 },
+  'claude-3-sonnet-20240229': { inputPer1K: 0.003, outputPer1K: 0.015 },
+  'claude-3-haiku-20240307': { inputPer1K: 0.00025, outputPer1K: 0.00125 },
+
   // Anthropic Claude via OpenRouter
   'anthropic/claude-3.5-sonnet': { inputPer1K: 0.003, outputPer1K: 0.015 },
   'openrouter:claude-3.5-sonnet': { inputPer1K: 0.003, outputPer1K: 0.015 },

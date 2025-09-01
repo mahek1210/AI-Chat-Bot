@@ -1,11 +1,11 @@
-# Chat AI App
+# AI Chat Bot
 
-A modern AI-powered chat application built with **Stream Chat**, **OpenAI**, and **web search capabilities**. This full-stack application provides an intelligent writing assistant that can help with content creation, research, and real-time collaboration.
+A modern AI-powered chat application built with **Stream Chat** and **multiple AI providers** including OpenAI, Google Gemini, Anthropic Claude, and more. This full-stack application provides an intelligent writing assistant that can help with content creation, research, and real-time collaboration.
 
 ## 🚀 Features
 
 - **Real-time Chat**: Powered by [GetStream.io](https://getstream.io) for seamless messaging
-- **AI Writing Assistant**: OpenAI GPT-4 integration for intelligent content generation
+- **Multi-Provider AI**: Support for OpenAI GPT-4, Google Gemini, Anthropic Claude, and more
 - **Web Search**: Live web search capabilities using Tavily API for current information
 - **Modern UI**: Beautiful React interface with dark/light theme support
 - **Writing Prompts**: Categorized writing prompts for business, content, communication, and creative tasks
@@ -15,15 +15,15 @@ A modern AI-powered chat application built with **Stream Chat**, **OpenAI**, and
 
 ## 🏗️ Architecture
 
-### Backend (`nodejs-ai-assistant/`)
+### Backend (`server/`)
 
 - **Node.js/Express** server
 - **Stream Chat** server-side integration
-- **OpenAI API** for AI responses
+- **Multi-Provider AI**: OpenAI, Google Gemini, Anthropic Claude, OpenRouter
 - **Tavily API** for web search functionality
 - Agent management system with automatic cleanup
 
-### Frontend (`react-stream-ai-assistant/`)
+### Frontend (`frontend/`)
 
 - **React** with TypeScript
 - **Stream Chat React** components
@@ -35,7 +35,11 @@ A modern AI-powered chat application built with **Stream Chat**, **OpenAI**, and
 - Node.js 20 or higher
 - npm or yarn package manager
 - GetStream.io account (free tier available)
-- OpenAI API account
+- At least one AI provider API account:
+  - OpenAI API account
+  - Google AI Studio account (for Gemini)
+  - Anthropic API account (for Claude)
+  - OpenRouter account (for multiple providers)
 - Tavily API account (for web search)
 
 ## 🛠️ Setup Instructions
@@ -52,7 +56,7 @@ cd chat-ai-app
 Navigate to the backend directory:
 
 ```bash
-cd nodejs-ai-assistant
+cd server
 ```
 
 Install dependencies:
@@ -70,6 +74,9 @@ cp .env.example .env
 Configure your `.env` file with the following keys:
 
 ```env
+# Server Configuration
+PORT=3000
+
 # GetStream credentials - Get these from https://getstream.io/dashboard
 STREAM_API_KEY=your_stream_api_key_here
 STREAM_API_SECRET=your_stream_api_secret_here
@@ -77,16 +84,49 @@ STREAM_API_SECRET=your_stream_api_secret_here
 # OpenAI API key - Get from https://platform.openai.com/api-keys
 OPENAI_API_KEY=your_openai_api_key_here
 
+# Google Gemini API key - Get from https://aistudio.google.com/app/apikey
+GEMINI_API_KEY=your_google_api_key_here
+GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+
+# Anthropic Claude API key - Get from https://console.anthropic.com/
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+
+# OpenRouter API key (optional) - Get from https://openrouter.ai/
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+
 # Tavily API key - Get from https://tavily.com
 TAVILY_API_KEY=your_tavily_api_key_here
 ```
 
-### 3. Frontend Setup
+**Note**: You only need to configure the API keys for the providers you want to use. At least one AI provider is required.
+
+### 3. Testing AI Models
+
+Before running the full application, you can test individual AI models using the test endpoint:
+
+```bash
+# Test OpenAI GPT-4o
+curl http://localhost:3000/test/gpt-4o
+
+# Test Google Gemini 1.5 Flash
+curl http://localhost:3000/test/gemini-1.5-flash
+
+# Test Anthropic Claude 3.5 Sonnet
+curl http://localhost:3000/test/claude-3-5-sonnet-20241022
+
+# Test OpenRouter models
+curl http://localhost:3000/test/openrouter:claude-3.5-sonnet
+```
+
+The test endpoint will return a JSON response with the model's response, usage statistics, and latency.
+
+### 4. Frontend Setup
 
 Navigate to the frontend directory:
 
 ```bash
-cd ../react-stream-ai-assistant
+cd ../frontend
 ```
 
 Install dependencies:
@@ -221,6 +261,8 @@ The frontend uses modern UI components built with:
 ### Backend Routes
 
 - `GET /` - Health check and server status
+- `GET /models` - Get supported AI models
+- `GET /test/:model` - Test a specific AI model with a sample prompt
 - `POST /start-ai-agent` - Initialize AI agent for a channel
 - `POST /stop-ai-agent` - Stop and cleanup AI agent
 - `GET /agent-status` - Check AI agent status
@@ -253,14 +295,14 @@ The frontend uses modern UI components built with:
 ### Backend Development
 
 ```bash
-cd nodejs-ai-assistant
+cd server
 npm run dev  # Starts with nodemon for auto-reload
 ```
 
 ### Frontend Development
 
 ```bash
-cd react-stream-ai-assistant
+cd frontend
 npm run dev  # Starts Vite dev server
 ```
 
@@ -268,11 +310,11 @@ npm run dev  # Starts Vite dev server
 
 ```bash
 # Backend
-cd nodejs-ai-assistant
+cd server
 npm run start
 
 # Frontend
-cd react-stream-ai-assistant
+cd frontend
 npm run build
 ```
 

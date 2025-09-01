@@ -26,8 +26,28 @@ const MODEL_OPTIONS: ModelOption[] = [
     provider: "OpenAI",
   },
   {
-    value: "openrouter:claude-3.5-sonnet",
+    value: "gemini-1.5-flash",
+    label: "Gemini 1.5 Flash",
+    provider: "Google",
+  },
+  {
+    value: "gemini-1.5-pro",
+    label: "Gemini 1.5 Pro",
+    provider: "Google",
+  },
+  {
+    value: "claude-3-5-sonnet-20241022",
     label: "Claude 3.5 Sonnet",
+    provider: "Anthropic",
+  },
+  {
+    value: "claude-3-opus-20240229",
+    label: "Claude 3 Opus",
+    provider: "Anthropic",
+  },
+  {
+    value: "openrouter:claude-3.5-sonnet",
+    label: "Claude 3.5 Sonnet (OpenRouter)",
     provider: "OpenRouter",
   },
   {

@@ -67,6 +67,52 @@ app.get("/models", (req, res) => {
   }
 });
 
+// Test route for model testing
+app.get("/test/:model", async (req, res) => {
+  try {
+    const { model } = req.params;
+    const llmFactory = new LLMFactory();
+    
+    console.log(`Testing model: ${model}`);
+    
+    const testRequest = {
+      messages: [
+        { role: 'user', content: 'Hello from test' }
+      ],
+      model: model,
+      temperature: 0.7,
+      maxTokens: 100,
+    };
+
+    const startTime = Date.now();
+    const response = await llmFactory.generate(testRequest);
+    const latency = Date.now() - startTime;
+
+    console.log(`Test successful for ${model}:`, {
+      content: response.content,
+      usage: response.usage,
+      latency: `${latency}ms`
+    });
+
+    res.json({
+      success: true,
+      model,
+      response: response.content,
+      usage: response.usage,
+      latency: `${latency}ms`,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error(`Test failed for model ${req.params.model}:`, error);
+    res.status(500).json({
+      success: false,
+      model: req.params.model,
+      error: error instanceof Error ? error.message : "Unknown error",
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 /**
  * Handle the request to start the AI Agent
  */
