@@ -3,6 +3,7 @@ import { OpenAIAdapter } from './adapters/openai-adapter';
 import { OpenRouterAdapter } from './adapters/openrouter-adapter';
 import { GeminiAdapter } from './adapters/gemini-adapter';
 import { AnthropicAdapter } from './adapters/anthropic-adapter';
+import { LlamaAdapter } from './adapters/llama-adapter';
 
 export class LLMFactory {
   private adapters: Map<string, LLMAdapter> = new Map();
@@ -67,8 +68,24 @@ export class LLMFactory {
       }
     }
 
+    // Initialize LLaMA adapter
+    const llamaApiKey = process.env.LLAMA_API_KEY;
+    if (llamaApiKey) {
+      const llamaAdapter = new LlamaAdapter({
+        apiKey: llamaApiKey,
+        baseURL: process.env.LLAMA_BASE_URL,
+        defaultModel: 'meta-llama/llama-3-8b-instruct',
+      });
+      this.adapters.set('llama', llamaAdapter);
+      
+      // Set as default if no other adapters are available
+      if (!this.defaultAdapter) {
+        this.defaultAdapter = llamaAdapter;
+      }
+    }
+
     if (!this.defaultAdapter) {
-      throw new Error('No LLM adapters configured. Please set OPENAI_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY');
+      throw new Error('No LLM adapters configured. Please set OPENAI_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY, or LLAMA_API_KEY');
     }
   }
 
@@ -123,14 +140,21 @@ export class LLMFactory {
            'gemini-1.0-pro',
            'gemini-1.0-pro-vision'
          );
-       } else if (adapter instanceof AnthropicAdapter) {
-         models.push(
-           'claude-3-5-sonnet-20241022',
-           'claude-3-opus-20240229',
-           'claude-3-sonnet-20240229',
-           'claude-3-haiku-20240307'
-         );
-       }
+               } else if (adapter instanceof AnthropicAdapter) {
+          models.push(
+            'claude-3-5-sonnet-20241022',
+            'claude-3-opus-20240229',
+            'claude-3-sonnet-20240229',
+            'claude-3-haiku-20240307'
+          );
+        } else if (adapter instanceof LlamaAdapter) {
+          models.push(
+            'meta-llama/llama-3-8b-instruct',
+            'meta-llama/llama-3-70b-instruct',
+            'meta-llama/llama-3.1-8b-instruct',
+            'meta-llama/llama-3.1-70b-instruct'
+          );
+        }
     }
     return [...new Set(models)]; // Remove duplicates
   }

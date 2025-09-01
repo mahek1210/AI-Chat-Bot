@@ -92,6 +92,10 @@ GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ANTHROPIC_BASE_URL=https://api.anthropic.com
 
+# Meta LLaMA API key - Get from https://openrouter.ai/
+LLAMA_API_KEY=your_llama_api_key_here
+LLAMA_BASE_URL=https://openrouter.ai/api/v1
+
 # OpenRouter API key (optional) - Get from https://openrouter.ai/
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 
@@ -103,11 +107,11 @@ TAVILY_API_KEY=your_tavily_api_key_here
 
 ### 3. Testing AI Models
 
-Before running the full application, you can test individual AI models using the test endpoint:
+The application automatically tests all available models on server startup. You can also test individual models manually:
 
 ```bash
-# Test OpenAI GPT-4o
-curl http://localhost:3000/test/gpt-4o
+# Test OpenAI GPT-4o Mini
+curl http://localhost:3000/test/gpt-4o-mini
 
 # Test Google Gemini 1.5 Flash
 curl http://localhost:3000/test/gemini-1.5-flash
@@ -115,11 +119,16 @@ curl http://localhost:3000/test/gemini-1.5-flash
 # Test Anthropic Claude 3.5 Sonnet
 curl http://localhost:3000/test/claude-3-5-sonnet-20241022
 
+# Test Meta LLaMA 3 8B
+curl http://localhost:3000/test/meta-llama/llama-3-8b-instruct
+
 # Test OpenRouter models
 curl http://localhost:3000/test/openrouter:claude-3.5-sonnet
 ```
 
 The test endpoint will return a JSON response with the model's response, usage statistics, and latency.
+
+**Automatic Testing**: When you start the server, it will automatically test all configured models and display the results in the console.
 
 ### 4. Frontend Setup
 

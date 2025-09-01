@@ -41,9 +41,9 @@ const MODEL_OPTIONS: ModelOption[] = [
     provider: "Anthropic",
   },
   {
-    value: "claude-3-opus-20240229",
-    label: "Claude 3 Opus",
-    provider: "Anthropic",
+    value: "meta-llama/llama-3-8b-instruct",
+    label: "LLaMA 3 8B",
+    provider: "Meta",
   },
   {
     value: "openrouter:claude-3.5-sonnet",
@@ -52,7 +52,7 @@ const MODEL_OPTIONS: ModelOption[] = [
   },
   {
     value: "openrouter:llama-3.1-70b",
-    label: "Llama 3.1 70B",
+    label: "Llama 3.1 70B (OpenRouter)",
     provider: "OpenRouter",
   },
 ];

@@ -29,6 +29,12 @@ export const PRICING_TABLE: Record<string, PricingEntry> = {
   // Llama via OpenRouter
   'meta-llama/llama-3.1-70b-instruct': { inputPer1K: 0.0006, outputPer1K: 0.0012 },
   'openrouter:llama-3.1-70b': { inputPer1K: 0.0006, outputPer1K: 0.0012 },
+  
+  // LLaMA Direct
+  'meta-llama/llama-3-8b-instruct': { inputPer1K: 0.0002, outputPer1K: 0.0004 },
+  'meta-llama/llama-3-70b-instruct': { inputPer1K: 0.0006, outputPer1K: 0.0012 },
+  'meta-llama/llama-3.1-8b-instruct': { inputPer1K: 0.0002, outputPer1K: 0.0004 },
+  'meta-llama/llama-3.1-70b-instruct': { inputPer1K: 0.0006, outputPer1K: 0.0012 },
 };
 
 export function estimateCostUSD(

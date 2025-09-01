@@ -6,7 +6,7 @@ import { AgentPlatform, AIAgent } from "./agents/types";
 import { apiKey, serverClient } from "./serverClient";
 import { LLMFactory } from "./llm/llm-factory";
 import { getMetrics } from "./metrics";
-
+import { LLMRequest } from "./llm/types";
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: "*" }));
@@ -75,19 +75,22 @@ app.get("/test/:model", async (req, res) => {
     
     console.log(`Testing model: ${model}`);
     
-    const testRequest = {
+    const testRequest: LLMRequest = {
       messages: [
-        { role: 'user', content: 'Hello from test' }
+        {
+          role: "user",
+          content: "Hello from test",
+        }
       ],
       model: model,
       temperature: 0.7,
       maxTokens: 100,
     };
-
+    
     const startTime = Date.now();
     const response = await llmFactory.generate(testRequest);
     const latency = Date.now() - startTime;
-
+    
     console.log(`Test successful for ${model}:`, {
       content: response.content,
       usage: response.usage,
@@ -259,6 +262,52 @@ async function disposeAiAgent(aiAgent: AIAgent) {
 
 // Start the Express server
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`Server is running on http://localhost:${port}`);
+  
+  // Test all available models on startup
+  await testAllModels();
 });
+
+// Function to test all available models
+async function testAllModels() {
+  try {
+    const llmFactory = new LLMFactory();
+    const supportedModels = llmFactory.getSupportedModels();
+    
+    console.log('\n🧪 Testing all available models...');
+    console.log(`Found ${supportedModels.length} models: ${supportedModels.join(', ')}\n`);
+    
+    const testModels = [
+      'gpt-4o-mini',
+      'gemini-1.5-flash', 
+      'claude-3-5-sonnet-20241022',
+      'meta-llama/llama-3-8b-instruct'
+    ];
+    
+    for (const model of testModels) {
+      if (supportedModels.includes(model)) {
+        try {
+          const testRequest: LLMRequest = {
+            messages: [{ role: 'user', content: 'Hello from test' }],
+            model,
+            temperature: 0.7,
+            maxTokens: 50,
+          };
+          
+          const startTime = Date.now();
+          const response = await llmFactory.generate(testRequest);
+          const latency = Date.now() - startTime;
+          
+          console.log(`✅ ${model}: ${response.content.substring(0, 50)}... (${latency}ms)`);
+        } catch (error) {
+          console.log(`❌ ${model}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+    }
+    
+    console.log('\n🎉 Model testing completed!\n');
+  } catch (error) {
+    console.error('Error during model testing:', error);
+  }
+}

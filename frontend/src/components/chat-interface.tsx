@@ -238,6 +238,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   backendUrl,
 }) => {
   const { channel } = useChatContext();
+  const { selectedModel } = useModel();
   const agentStatus = useAIAgentStatus({
     channelId: channel?.id ?? null,
     backendUrl,
@@ -324,7 +325,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 {channel?.data?.name || "New Writing Session"}
               </h2>
               <p className="text-xs text-muted-foreground">
-                AI Writing Assistant • Always improving
+                AI Writing Assistant • {selectedModel || "Default Model"}
               </p>
             </div>
           </div>
