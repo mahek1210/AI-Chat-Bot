@@ -77,6 +77,9 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
 
     // Extract model from message custom field if provided
     const model = (e.message.custom as { model?: string })?.model;
+    
+    // Log the model selection for debugging
+    console.log(`🎯 LLM Agent received request with model: ${model || 'default'}`);
 
     const { message: channelMessage } = await this.channel.sendMessage({
       text: "",

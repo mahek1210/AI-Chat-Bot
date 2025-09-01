@@ -94,19 +94,80 @@ export class LLMFactory {
     
     // If no model specified, use default adapter
     if (!model) {
+      console.log(`No model specified, using default adapter: ${this.defaultAdapter.constructor.name}`);
       return this.defaultAdapter.generate(request);
     }
 
-    // Try to find an adapter that supports this model
-    for (const [name, adapter] of this.adapters) {
-      if (adapter.supportsModel(model)) {
-        return adapter.generate(request);
+    console.log(`Routing request to provider for model: ${model}`);
+
+    // Route based on model prefix and patterns
+    const adapter = this.routeModelToAdapter(model);
+    
+    if (adapter) {
+      console.log(`✅ Using adapter: ${adapter.constructor.name} for model: ${model}`);
+      return adapter.generate(request);
+    }
+
+    // If no adapter found, fall back to default
+    console.warn(`❌ No adapter found for model ${model}, falling back to default: ${this.defaultAdapter.constructor.name}`);
+    return this.defaultAdapter.generate(request);
+  }
+
+  private routeModelToAdapter(model: string): LLMAdapter | null {
+    // OpenAI models: gpt-* or openai/*
+    if (model.startsWith('gpt-') || model.startsWith('openai/')) {
+      const adapter = this.adapters.get('openai');
+      if (adapter) {
+        console.log(`🔄 Routing to OpenAI adapter for model: ${model}`);
+        return adapter;
       }
     }
 
-    // If no adapter supports the requested model, fall back to default
-    console.warn(`Model ${model} not supported by any adapter, falling back to default`);
-    return this.defaultAdapter.generate(request);
+    // Google Gemini models: gemini-* or google/*
+    if (model.startsWith('gemini-') || model.startsWith('google/')) {
+      const adapter = this.adapters.get('gemini');
+      if (adapter) {
+        console.log(`🔄 Routing to Gemini adapter for model: ${model}`);
+        return adapter;
+      }
+    }
+
+    // Anthropic Claude models: claude-* or anthropic/*
+    if (model.startsWith('claude-') || model.startsWith('anthropic/')) {
+      const adapter = this.adapters.get('anthropic');
+      if (adapter) {
+        console.log(`🔄 Routing to Anthropic adapter for model: ${model}`);
+        return adapter;
+      }
+    }
+
+    // Meta LLaMA models: llama-* or meta-llama/*
+    if (model.startsWith('llama-') || model.startsWith('meta-llama/')) {
+      const adapter = this.adapters.get('llama');
+      if (adapter) {
+        console.log(`🔄 Routing to LLaMA adapter for model: ${model}`);
+        return adapter;
+      }
+    }
+
+    // OpenRouter models: openrouter:*
+    if (model.startsWith('openrouter:')) {
+      const adapter = this.adapters.get('openrouter');
+      if (adapter) {
+        console.log(`🔄 Routing to OpenRouter adapter for model: ${model}`);
+        return adapter;
+      }
+    }
+
+    // Fallback: try to find an adapter that explicitly supports this model
+    for (const [name, adapter] of this.adapters) {
+      if (adapter.supportsModel(model)) {
+        console.log(`🔄 Using explicit support from ${adapter.constructor.name} for model: ${model}`);
+        return adapter;
+      }
+    }
+
+    return null;
   }
 
   getSupportedModels(): string[] {

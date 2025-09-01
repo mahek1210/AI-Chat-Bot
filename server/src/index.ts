@@ -73,7 +73,7 @@ app.get("/test/:model", async (req, res) => {
     const { model } = req.params;
     const llmFactory = new LLMFactory();
     
-    console.log(`Testing model: ${model}`);
+    console.log(`🧪 Testing model: ${model}`);
     
     const testRequest: LLMRequest = {
       messages: [
@@ -91,7 +91,7 @@ app.get("/test/:model", async (req, res) => {
     const response = await llmFactory.generate(testRequest);
     const latency = Date.now() - startTime;
     
-    console.log(`Test successful for ${model}:`, {
+    console.log(`✅ Test successful for ${model}:`, {
       content: response.content,
       usage: response.usage,
       latency: `${latency}ms`
@@ -106,7 +106,7 @@ app.get("/test/:model", async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error(`Test failed for model ${req.params.model}:`, error);
+    console.error(`❌ Test failed for model ${req.params.model}:`, error);
     res.status(500).json({
       success: false,
       model: req.params.model,
