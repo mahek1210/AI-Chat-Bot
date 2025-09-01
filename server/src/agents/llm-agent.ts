@@ -8,12 +8,15 @@ import { recordRequest } from "../metrics";
 export class LLMAgent implements AIAgent {
   private llmFactory: LLMFactory;
   private lastInteractionTs = Date.now();
+  private defaultModel: string;
 
   constructor(
     readonly chatClient: StreamChat,
-    readonly channel: Channel
+    readonly channel: Channel,
+    model?: string
   ) {
     this.llmFactory = new LLMFactory();
+    this.defaultModel = model || this.llmFactory.getDefaultModel();
   }
 
   dispose = async () => {
@@ -75,11 +78,16 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
     const context = writingTask ? `Writing Task: ${writingTask}` : undefined;
     const systemPrompt = this.getWritingAssistantPrompt(context);
 
-    // Extract model from message custom field if provided
-    const model = (e.message.custom as { model?: string })?.model;
+    // Extract model from message custom field if provided, otherwise use the agent's default model
+    const model = (e.message.custom as { model?: string })?.model || this.defaultModel;
     
     // Log the model selection for debugging
-    console.log(`🎯 LLM Agent received request with model: ${model || 'default'}`);
+    console.log(`🎯 LLM Agent received request with model: ${model}`);
+    
+    // Ensure model is always provided
+    if (!model) {
+      throw new Error("Model is required but not provided in request or agent configuration");
+    }
 
     const { message: channelMessage } = await this.channel.sendMessage({
       text: "",
@@ -195,7 +203,7 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
       // Compute latency and cost
       const latencyMs = Date.now() - startedAt;
       const costUSD = estimateCostUSD(
-        model || this.llmFactory.getDefaultModel(),
+        model,
         totalUsage.promptTokens,
         totalUsage.completionTokens
       );
@@ -206,7 +214,7 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
 
       // Record metrics
       recordRequest({
-        model: model || this.llmFactory.getDefaultModel(),
+        model: model,
         latencyMs,
         promptTokens: totalUsage.promptTokens,
         completionTokens: totalUsage.completionTokens,
@@ -219,7 +227,7 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
           text: finalResponse,
           custom: {
             usage: totalUsage,
-            model: model || this.llmFactory.getDefaultModel(),
+            model: model,
           },
         },
       });

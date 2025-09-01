@@ -108,9 +108,10 @@ export class LLMFactory {
       return adapter.generate(request);
     }
 
-    // If no adapter found, fall back to default
-    console.warn(`❌ No adapter found for model ${model}, falling back to default: ${this.defaultAdapter.constructor.name}`);
-    return this.defaultAdapter.generate(request);
+    // If no adapter found, throw an error instead of falling back to default
+    const errorMessage = `No adapter found for model: ${model}. Supported models: ${this.getSupportedModels().join(', ')}`;
+    console.error(`❌ ${errorMessage}`);
+    throw new Error(errorMessage);
   }
 
   private routeModelToAdapter(model: string): LLMAdapter | null {

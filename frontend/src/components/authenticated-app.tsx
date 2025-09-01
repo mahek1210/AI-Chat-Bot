@@ -17,6 +17,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ChatProvider } from "../providers/chat-provider";
 import { ChatInterface } from "./chat-interface";
 import { ChatSidebar } from "./chat-sidebar";
+import { useModel } from "@/contexts/model-context";
 
 interface AuthenticatedAppProps {
   user: User;
@@ -57,6 +58,10 @@ const AuthenticatedCore = ({ user, onLogout }: AuthenticatedAppProps) => {
     if (!user.id) return;
 
     try {
+      // Get the selected model from context
+      const { selectedModel } = useModel();
+      console.log("Selected model in frontend:", selectedModel);
+
       // 1. Create a new channel with the user as the only member
       const newChannel = client.channel("messaging", uuidv4(), {
         name: message.text.substring(0, 50),
@@ -76,12 +81,14 @@ const AuthenticatedCore = ({ user, onLogout }: AuthenticatedAppProps) => {
       });
 
       // 3. Connect the AI agent
+      console.log("Sending request with model:", selectedModel);
       const response = await fetch(`${backendUrl}/start-ai-agent`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           channel_id: newChannel.id,
           channel_type: "messaging",
+          model: selectedModel,
         }),
       });
 
@@ -93,9 +100,14 @@ const AuthenticatedCore = ({ user, onLogout }: AuthenticatedAppProps) => {
       setActiveChannel(newChannel);
       navigate(`/chat/${newChannel.id}`);
 
-      // 5. Wait for AI agent to be added as member, then send message
+      // 5. Wait for AI agent to be added as member, then send message with model
       await memberAddedPromise;
-      await newChannel.sendMessage(message);
+      await newChannel.sendMessage({
+        ...message,
+        custom: {
+          model: selectedModel,
+        },
+      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Something went wrong";

@@ -276,6 +276,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
     const handleSendMessage = async (message: { text: string }) => {
       // Include the selected model in the message custom field
+      console.log("Selected model in frontend:", selectedModel);
       await sendMessage({
         ...message,
         custom: {

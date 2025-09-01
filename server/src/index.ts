@@ -120,8 +120,8 @@ app.get("/test/:model", async (req, res) => {
  * Handle the request to start the AI Agent
  */
 app.post("/start-ai-agent", async (req, res) => {
-  const { channel_id, channel_type = "messaging" } = req.body;
-  console.log(`[API] /start-ai-agent called for channel: ${channel_id}`);
+  const { channel_id, channel_type = "messaging", model } = req.body;
+  console.log(`[API] /start-ai-agent called for channel: ${channel_id} with model: ${model}`);
 
   // Simple validation
   if (!channel_id) {
@@ -149,7 +149,8 @@ app.post("/start-ai-agent", async (req, res) => {
         user_id,
         AgentPlatform.LLM,
         channel_type,
-        channel_id
+        channel_id,
+        model
       );
 
       await agent.init();

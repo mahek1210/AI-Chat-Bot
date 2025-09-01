@@ -8,7 +8,8 @@ export const createAgent = async (
   user_id: string,
   platform: AgentPlatform,
   channel_type: string,
-  channel_id: string
+  channel_id: string,
+  model?: string
 ): Promise<AIAgent> => {
   const token = serverClient.createToken(user_id);
   // This is the client for the AI bot user
@@ -25,7 +26,7 @@ export const createAgent = async (
     case AgentPlatform.OPENAI:
       return new OpenAIAgent(chatClient, channel);
     case AgentPlatform.LLM:
-      return new LLMAgent(chatClient, channel);
+      return new LLMAgent(chatClient, channel, model);
     default:
       throw new Error(`Unsupported agent platform: ${platform}`);
   }
