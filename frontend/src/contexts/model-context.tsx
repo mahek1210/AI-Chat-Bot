@@ -10,7 +10,7 @@ const ModelContext = createContext<ModelContextType | undefined>(undefined);
 const STORAGE_KEY = "selected-model";
 
 export const ModelProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [selectedModel, setSelectedModelState] = useState<string>("gpt-4o");
+  const [selectedModel, setSelectedModelState] = useState<string>("gpt-4o-mini");
 
   useEffect(() => {
     // Load selected model from localStorage on mount

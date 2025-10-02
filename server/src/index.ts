@@ -4,9 +4,9 @@ import express from "express";
 import { createAgent } from "./agents/createAgent";
 import { AgentPlatform, AIAgent } from "./agents/types";
 import { apiKey, serverClient } from "./serverClient";
-import { LLMFactory } from "./llm/llm-factory";
 import { getMetrics } from "./metrics";
 import { LLMRequest } from "./llm/types";
+import { AIRouter } from "./services/aiRouter";
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: "*" }));
@@ -35,6 +35,7 @@ app.get("/", (req, res) => {
     message: "AI Writing Assistant Server is running",
     apiKey: apiKey,
     activeAgents: aiAgentCache.size,
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -50,9 +51,9 @@ app.get("/metrics", (req, res) => {
 
 app.get("/models", (req, res) => {
   try {
-    const llmFactory = new LLMFactory();
-    const supportedModels = llmFactory.getSupportedModels();
-    const defaultModel = llmFactory.getDefaultModel();
+    const aiRouter = new AIRouter();
+    const supportedModels = aiRouter.getSupportedModels();
+    const defaultModel = aiRouter.getDefaultModel();
     
     res.json({
       supportedModels,
@@ -67,11 +68,31 @@ app.get("/models", (req, res) => {
   }
 });
 
+// List available Gemini models
+app.get("/gemini-models", async (req, res) => {
+  try {
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(400).json({ error: "GEMINI_API_KEY not configured" });
+    }
+    
+    res.json({ 
+      message: "Gemini API key is configured",
+      note: "Use /test/gemini-pro to test specific models"
+    });
+  } catch (error) {
+    console.error("Error checking Gemini:", error);
+    res.status(500).json({
+      error: "Failed to check Gemini",
+      reason: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
 // Test route for model testing
 app.get("/test/:model", async (req, res) => {
   try {
     const { model } = req.params;
-    const llmFactory = new LLMFactory();
+    const aiRouter = new AIRouter();
     
     console.log(`🧪 Testing model: ${model}`);
     
@@ -88,10 +109,10 @@ app.get("/test/:model", async (req, res) => {
     };
     
     const startTime = Date.now();
-    const response = await llmFactory.generate(testRequest);
+    const response = await aiRouter.routeRequest(testRequest);
     const latency = Date.now() - startTime;
     
-    console.log(`✅ Test successful for ${model}:`, {
+    console.log(`✅ Test successful for ${model} using ${response.provider} provider:`, {
       content: response.content,
       usage: response.usage,
       latency: `${latency}ms`
@@ -273,7 +294,7 @@ app.listen(port, async () => {
 // Function to test all available models
 async function testAllModels() {
   try {
-    const llmFactory = new LLMFactory();
+    const llmFactory = new AIRouter();
     const supportedModels = llmFactory.getSupportedModels();
     
     console.log('\n🧪 Testing all available models...');
@@ -297,7 +318,7 @@ async function testAllModels() {
           };
           
           const startTime = Date.now();
-          const response = await llmFactory.generate(testRequest);
+          const response = await llmFactory.routeRequest(testRequest);
           const latency = Date.now() - startTime;
           
           console.log(`✅ ${model}: ${response.content.substring(0, 50)}... (${latency}ms)`);

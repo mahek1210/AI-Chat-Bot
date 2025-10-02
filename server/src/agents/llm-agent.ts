@@ -1,22 +1,25 @@
 import type { Channel, DefaultGenerics, Event, StreamChat } from "stream-chat";
 import type { AIAgent } from "./types";
-import { LLMFactory } from "../llm/llm-factory";
 import { LLMRequest, LLMMessage, LLMResponse } from "../llm/types";
 import { estimateCostUSD } from "../llm/pricing";
 import { recordRequest } from "../metrics";
+import { AIRouter } from "../services/aiRouter";
 
 export class LLMAgent implements AIAgent {
-  private llmFactory: LLMFactory;
+  private aiRouter: AIRouter;
   private lastInteractionTs = Date.now();
   private defaultModel: string;
+  private provider: string;
 
   constructor(
     readonly chatClient: StreamChat,
     readonly channel: Channel,
     model?: string
   ) {
-    this.llmFactory = new LLMFactory();
-    this.defaultModel = model || this.llmFactory.getDefaultModel();
+    this.aiRouter = new AIRouter();
+    this.defaultModel = model || this.aiRouter.getDefaultModel();
+    // Store the provider based on the model for future messages
+    this.provider = model ? this.aiRouter.detectProvider(model) : 'openai';
   }
 
   dispose = async () => {
@@ -82,7 +85,7 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
     const model = (e.message.custom as { model?: string })?.model || this.defaultModel;
     
     // Log the model selection for debugging
-    console.log(`🎯 LLM Agent received request with model: ${model}`);
+    console.log(`🎯 LLM Agent received request with model: ${model} (from custom: ${(e.message.custom as { model?: string })?.model}, default: ${this.defaultModel})`);
     
     // Ensure model is always provided
     if (!model) {
@@ -145,7 +148,7 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
           ] : undefined,
         };
 
-        const response = await this.llmFactory.generate(llmRequest);
+        const response = await this.aiRouter.routeRequest(llmRequest);
 
         // Accumulate usage
         totalUsage.promptTokens += response.usage.promptTokens;
@@ -225,10 +228,6 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
       await this.chatClient.partialUpdateMessage(channelMessage.id, {
         set: {
           text: finalResponse,
-          custom: {
-            usage: totalUsage,
-            model: model,
-          },
         },
       });
 
@@ -240,9 +239,12 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
 
     } catch (error) {
       console.error("Error generating response:", error);
+      const errorMessage = error instanceof Error ? error.message : "Error generating response";
+      console.error("Full error details:", error);
+      
       await this.chatClient.partialUpdateMessage(channelMessage.id, {
         set: {
-          text: error instanceof Error ? error.message : "Error generating response",
+          text: `Error: ${errorMessage}`,
         },
       });
 

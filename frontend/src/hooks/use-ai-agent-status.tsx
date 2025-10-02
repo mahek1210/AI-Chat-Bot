@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useModel } from "@/contexts/model-context";
 
 export type AgentStatus = "disconnected" | "connecting" | "connected";
 
@@ -11,6 +12,7 @@ export const useAIAgentStatus = ({
   channelId,
   backendUrl,
 }: UseAIAgentStatusProps) => {
+  const { selectedModel } = useModel();
   // Start with "disconnected" and determine status via effects
   const [status, setStatus] = useState<AgentStatus>("disconnected");
   const [loading, setLoading] = useState(false);
@@ -56,6 +58,7 @@ export const useAIAgentStatus = ({
     setStatus("connecting"); // Optimistic update
 
     try {
+      console.log(`[useAIAgentStatus] Starting agent with model: ${selectedModel}`);
       const response = await fetch(`${backendUrl}/start-ai-agent`, {
         method: "POST",
         headers: {
@@ -64,6 +67,7 @@ export const useAIAgentStatus = ({
         body: JSON.stringify({
           channel_id: channelId,
           channel_type: "messaging",
+          model: selectedModel,
         }),
       });
 
@@ -86,7 +90,7 @@ export const useAIAgentStatus = ({
     } finally {
       await checkStatus();
     }
-  }, [channelId, backendUrl, loading, checkStatus]);
+  }, [channelId, backendUrl, loading, checkStatus, selectedModel]);
 
   // Disconnect AI agent
   const disconnectAgent = useCallback(async () => {

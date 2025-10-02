@@ -31,6 +31,7 @@ export interface LLMResponse {
     latencyMs?: number;
   };
   toolCalls?: LLMToolCall[];
+  provider?: string;
 }
 
 export interface LLMToolCall {

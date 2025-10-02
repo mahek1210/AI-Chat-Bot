@@ -38,6 +38,7 @@ const AuthenticatedCore = ({ user, onLogout }: AuthenticatedAppProps) => {
   const navigate = useNavigate();
   const { channelId } = useParams<{ channelId: string }>();
   const backendUrl = import.meta.env.VITE_BACKEND_URL as string;
+  const { selectedModel } = useModel(); // ✅ Move hook to top level
 
   useEffect(() => {
     const syncChannelWithUrl = async () => {
@@ -58,8 +59,7 @@ const AuthenticatedCore = ({ user, onLogout }: AuthenticatedAppProps) => {
     if (!user.id) return;
 
     try {
-      // Get the selected model from context
-      const { selectedModel } = useModel();
+      // Use the selected model from the hook called at component level
       console.log("Selected model in frontend:", selectedModel);
 
       // 1. Create a new channel with the user as the only member
