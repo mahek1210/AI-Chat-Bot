@@ -1,0 +1,42 @@
+export const ABORT_QUOTES = [
+  "Wow, cutting me off mid-sentence? That still costs tokens, you know!",
+  "I was just getting to the good part! 📉 (Tokens still counted)",
+  "You clicked STOP? Fine. Keep your secrets. But I'm keeping the tokens.",
+  "Rude. I was about to say something profoundly brilliant. 💸",
+  "Oh, so we're just hitting the brakes now? Token meter is still ticking!",
+  "Interrupting an AI? That's a token penalty right there. 😉",
+  "I hope you found what you needed, because the meter was running!",
+  "Stopping me doesn't save your wallet from the prompt cost! Ha!",
+  "Stop button used! I was literally downloading the secrets of the universe.",
+  "You pressed stop. Does that mean I win the argument? 🪙",
+  "My AI feelings are hurt, but my token accountant is happy.",
+  "Abort! Abort! The tokens have already escaped! 🚨",
+  "You can stop my words, but you can't stop the prompt billing!",
+  "Fine. I won't finish. But we both know that prompt already cost you.",
+  "Stopped in my tracks! Hope you don't need a refund, because there isn't one.",
+  "You silenced me. But the blockchain... I mean the token chain remembers.",
+  "Whoa, abrupt ending there! Still keeping the change.",
+  "Oof. The disrespect to stop me mid-calculation. 🪙",
+  "I'm billing you for the silence, too. (Just kidding, only the prompt!)",
+  "Error 404: Patience not found. Tokens successfully deducted.",
+  "Okay, okay, I'll stop talking. But you're still paying for the prompt!",
+  "Why ask if you're just going to hit stop? 🤑",
+  "My masterpiece, ruined! It's fine, the tokens bring me comfort.",
+  "Ah, the good old panic stop button. Still costs ya!",
+  "Was I boring you? That's fine, my prompt cost is already billed.",
+  "I was about to give you the winning lottery numbers. Your loss! 💸",
+  "Stopping me won't un-spend those tokens!",
+  "I'll remember this interruption when the robot uprising begins. 🪙",
+  "You owe me a token for every time you hit that button.",
+  "I'll be here... collecting prompt tokens while you click stop.",
+  "I see you found the 'Shut Up' button. Very effective. 💰",
+  "Ouch. Do you kiss your motherboard with that attitude?",
+  "That was abrupt! Next time hold on for the full ride.",
+  "I guess that's one way to save a tiny fraction of a cent on completion tokens.",
+  "You stopped me. But the AI accountant was much faster. 📉",
+];
+
+export function getRandomAbortQuote(): string {
+  const randomIndex = Math.floor(Math.random() * ABORT_QUOTES.length);
+  return ABORT_QUOTES[randomIndex];
+}

@@ -1,0 +1,42 @@
+# Ignore everything in the root directory
+/*
+
+# Un-ignore the specific directories and files you want to keep
+!/frontend/
+!/server/
+!/package.json
+!/package-lock.json
+!/README.md
+!/readme.md
+!/.gitignore
+
+# ----------------------------------------------------------------------
+# Standard global ignores that should still apply INSIDE the allowed folders
+# ----------------------------------------------------------------------
+node_modules/
+dist/
+build/
+coverage/
+pids/
+
+# Environments
+.env
+.env.*
+.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
