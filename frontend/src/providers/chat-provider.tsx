@@ -164,43 +164,38 @@ const ChatClientProvider = ({ user, children }: ChatProviderProps) => {
     }
 
     const { token } = await response.json();
+    localStorage.setItem('stream_jwt_token', token);
     return token;
   }, [user]);
+
+  // Stable ref for tokenProvider — avoids adding it to useEffect deps
+  const tokenProviderRef = useRef(tokenProvider);
+  useEffect(() => { tokenProviderRef.current = tokenProvider; }, [tokenProvider]);
 
   useEffect(() => {
     let isMounted = true;
     let client: StreamChat | null = null;
     let currentTimeout: ReturnType<typeof setTimeout>;
     let retryCount = 0;
+    let isConnecting = false; // lock to prevent double connectUser
 
     const connectChat = async () => {
+      if (isConnecting) return; // Guard against concurrent calls
+      isConnecting = true;
       try {
         if (!isMounted) return;
         setStatus("connecting");
         setConnectionError(null);
         setErrorType(null);
 
-        // Disconnect exactly if an old instance was leftover
+        // Get the singleton client and disconnect if already connected
         client = StreamChat.getInstance(apiKey);
         if (client.userID) {
           await client.disconnectUser();
         }
 
-        // 1. Fully wait for the first token internally before calling connectUser
-        // so that connectUser doesn't stall without a token ready.
-        const initialToken = await tokenProvider();
-        
-        // 2. Wrap it so Stream SDK automatically refreshes if it expires
-        const refreshProvider = async () => {
-           // Provide the initially fetched token for the first call, after that fetch perfectly fresh
-           const localInit = initialToken;
-           if (localInit) {
-             return localInit; // NOTE: The SDK usually just takes the direct promise of tokenProvider, but we already pre-fetched
-           }
-           return tokenProvider();
-        };
-
-        await client.connectUser(user, tokenProvider);
+        // Connect with the token provider — use ref so Effect doesn't re-run when tokenProvider changes
+        await client.connectUser(user, tokenProviderRef.current);
 
         if (isMounted) {
           setChatClient(client);
@@ -209,6 +204,7 @@ const ChatClientProvider = ({ user, children }: ChatProviderProps) => {
         }
 
       } catch (error: any) {
+        isConnecting = false;
         if (!isMounted) return;
         
         console.error("Stream Chat connection error:", error);
@@ -251,7 +247,8 @@ const ChatClientProvider = ({ user, children }: ChatProviderProps) => {
         client.disconnectUser().catch(console.error);
       }
     };
-  }, [user, tokenProvider, retryKey, setStatus, setErrorType]);
+  // Only re-run when userId or retryKey changes — NOT on tokenProvider re-creation
+  }, [user.id, retryKey, setStatus, setErrorType]);
 
   const handleRetry = () => {
     // Manually trigger a fresh connect attempt

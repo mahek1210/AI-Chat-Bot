@@ -5,6 +5,7 @@ export interface LLMRequest {
   maxTokens?: number;
   tools?: LLMTool[];
   abortSignal?: AbortSignal;
+  onChunk?: (chunk: string) => void;
 }
 
 export interface LLMMessage {

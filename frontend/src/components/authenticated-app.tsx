@@ -18,6 +18,18 @@ import { ChatProvider } from "../providers/chat-provider";
 import { ChatInterface } from "./chat-interface";
 import { ChatSidebar } from "./chat-sidebar";
 import { useModel } from "@/contexts/model-context";
+import { useProfile } from "@/contexts/profile-context";
+
+// ── Auto-title helper ────────────────────────────────────────────────────────
+// Generates a concise title from the first user message (runs client-side,
+// no extra network call needed).
+function generateTitle(text: string): string {
+  const clean = text.trim().replace(/[?.!,]+$/, '').trim();
+  if (clean.length <= 50) return clean;
+  const cut = clean.slice(0, 50);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > 20 ? cut.slice(0, lastSpace) : cut) + '…';
+}
 
 interface AuthenticatedAppProps {
   user: User;
@@ -41,7 +53,16 @@ const AuthenticatedCore = ({ user, onLogout, onDeleteAccount }: AuthenticatedApp
   const navigate = useNavigate();
   const { channelId } = useParams<{ channelId: string }>();
   const backendUrl = import.meta.env.VITE_BACKEND_URL as string;
-  const { selectedModel } = useModel(); // ✅ Move hook to top level
+  const { selectedModel } = useModel();
+  const { activeProfile, categoryChanged } = useProfile();
+
+  // When user switches to a persona in a DIFFERENT category, go to empty state (new session)
+  useEffect(() => {
+    if (categoryChanged) {
+      setActiveChannel(undefined);
+      navigate('/');
+    }
+  }, [categoryChanged]);
 
   useEffect(() => {
     const syncChannelWithUrl = async () => {
@@ -65,10 +86,15 @@ const AuthenticatedCore = ({ user, onLogout, onDeleteAccount }: AuthenticatedApp
       // Use the selected model from the hook called at component level
       console.log("Selected model in frontend:", selectedModel);
 
-      // 1. Create a new channel with the user as the only member
+      // 1. Create a new channel with the user as the only member + persona metadata
       const newChannel = client.channel("messaging", uuidv4(), {
-        name: message.text.substring(0, 50),
+        name: `New ${activeProfile.name} Session`,
         members: [user.id],
+        profileId: activeProfile.id,
+        profileEmoji: activeProfile.emoji,
+        profileName: activeProfile.name,
+        profileCategory: activeProfile.category,
+        usedProfileEmojis: [activeProfile.emoji],
       });
       await newChannel.watch();
 
@@ -92,6 +118,8 @@ const AuthenticatedCore = ({ user, onLogout, onDeleteAccount }: AuthenticatedApp
           channel_id: newChannel.id,
           channel_type: "messaging",
           model: selectedModel,
+          profileId: activeProfile.id,
+          customProfilePrompt: activeProfile.systemPrompt || undefined,
         }),
       });
 
@@ -111,6 +139,18 @@ const AuthenticatedCore = ({ user, onLogout, onDeleteAccount }: AuthenticatedApp
           model: selectedModel,
         },
       });
+
+      // 6. Auto-generate a title from the first message and update the channel
+      if (newChannel.state.messages.length === 1) {
+        try {
+          const generatedTitle = generateTitle(message.text);
+          await newChannel.update({ name: generatedTitle });
+          console.log("Chat title auto-generated:", generatedTitle);
+        } catch (err) {
+          console.error('Title update failed:', err);
+          // Do NOT crash the chat — swallow the error silently
+        }
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Something went wrong";

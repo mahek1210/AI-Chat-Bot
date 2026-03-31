@@ -72,7 +72,51 @@ export class OpenRouterService {
 
         try {
           console.log(`[OpenRouter] Attempting to generate text with ${currentModel}...`);
-          response = await this.client.chat.completions.create(createParams, requestOptions);
+          
+          if (request.onChunk) {
+            const streamOptions = { ...createParams, stream: true as const, stream_options: { include_usage: true } };
+            const stream = await this.client.chat.completions.create(streamOptions, requestOptions);
+            
+            let rawToolCalls: any[] = [];
+            response = { choices: [{ message: { content: '', tool_calls: undefined as any } }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } } as any;
+            
+            for await (const chunk of stream) {
+              if (chunk.choices && chunk.choices.length > 0) {
+                const delta = chunk.choices[0].delta;
+                if (delta.content) {
+                  (response as any).choices[0].message.content += delta.content;
+                  request.onChunk(delta.content);
+                }
+                
+                if (delta.tool_calls) {
+                  for (const tc of delta.tool_calls) {
+                    const index = tc.index;
+                    if (!rawToolCalls[index]) {
+                      rawToolCalls[index] = {
+                        id: tc.id || '',
+                        type: 'function',
+                        function: { name: tc.function?.name || '', arguments: tc.function?.arguments || '' }
+                      };
+                    } else {
+                      if (tc.function?.arguments) {
+                        rawToolCalls[index].function.arguments += tc.function.arguments;
+                      }
+                    }
+                  }
+                }
+              }
+              if (chunk.usage) {
+                (response as any).usage = chunk.usage;
+              }
+            }
+            
+            if (rawToolCalls.length > 0) {
+               (response as any).choices[0].message.tool_calls = rawToolCalls.filter(Boolean);
+            }
+          } else {
+            response = await this.client.chat.completions.create(createParams, requestOptions);
+          }
+          
           actualModelUsed = currentModel;
           break; // Success!
         } catch (error: any) {
@@ -82,7 +126,49 @@ export class OpenRouterService {
             delete createParams.tool_choice;
             
             try {
-              response = await this.client.chat.completions.create(createParams, requestOptions);
+              if (request.onChunk) {
+                const streamOptions = { ...createParams, stream: true as const, stream_options: { include_usage: true } };
+                const stream = await this.client.chat.completions.create(streamOptions, requestOptions);
+                
+                let rawToolCalls: any[] = [];
+                response = { choices: [{ message: { content: '', tool_calls: undefined as any } }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } } as any;
+                
+                for await (const chunk of stream) {
+                  if (chunk.choices && chunk.choices.length > 0) {
+                    const delta = chunk.choices[0].delta;
+                    if (delta.content) {
+                      (response as any).choices[0].message.content += delta.content;
+                      request.onChunk(delta.content);
+                    }
+                    if (delta.tool_calls) {
+                      for (const tc of delta.tool_calls) {
+                        const index = tc.index;
+                        if (!rawToolCalls[index]) {
+                          rawToolCalls[index] = {
+                            id: tc.id || '',
+                            type: 'function',
+                            function: { name: tc.function?.name || '', arguments: tc.function?.arguments || '' }
+                          };
+                        } else {
+                          if (tc.function?.arguments) {
+                            rawToolCalls[index].function.arguments += tc.function.arguments;
+                          }
+                        }
+                      }
+                    }
+                  }
+                  if (chunk.usage) {
+                    (response as any).usage = chunk.usage;
+                  }
+                }
+                
+                if (rawToolCalls.length > 0) {
+                   (response as any).choices[0].message.tool_calls = rawToolCalls.filter(Boolean);
+                }
+              } else {
+                response = await this.client.chat.completions.create(createParams, requestOptions);
+              }
+              
               actualModelUsed = currentModel;
               break; // Success without tools!
             } catch (retryError: any) {
@@ -105,7 +191,7 @@ export class OpenRouterService {
 
       let toolCalls: LLMToolCall[] | undefined;
       if (message.tool_calls && message.tool_calls.length > 0) {
-        toolCalls = message.tool_calls.map(tc => ({
+        toolCalls = message.tool_calls.map((tc: any) => ({
           id: tc.id,
           type: 'function' as const,
           function: {

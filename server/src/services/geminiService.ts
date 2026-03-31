@@ -167,8 +167,19 @@ export class GeminiService {
         }
 
         const requestOptions = request.abortSignal ? { signal: request.abortSignal } : undefined;
-        const result = await model.generateContent({ contents: mergedMessages }, requestOptions);
-        const text = result.response.text() || '';
+        
+        let text = '';
+        if (request.onChunk) {
+           const result = await model.generateContentStream({ contents: mergedMessages }, requestOptions);
+           for await (const chunk of result.stream) {
+              const chunkText = chunk.text();
+              text += chunkText;
+              request.onChunk(chunkText);
+           }
+        } else {
+           const result = await model.generateContent({ contents: mergedMessages }, requestOptions);
+           text = result.response.text() || '';
+        }
         
         console.log(`✅ Successfully generated response using defined model: ${modelNameToTry}`);
         

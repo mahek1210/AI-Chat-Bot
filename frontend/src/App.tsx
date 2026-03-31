@@ -2,6 +2,7 @@ import { AuthenticatedApp } from "@/components/authenticated-app";
 import { Login } from "@/components/login";
 import { Toaster } from "@/components/ui/toaster";
 import { ModelProvider } from "@/contexts/model-context";
+import { ProfileProvider } from "@/contexts/profile-context";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { useState } from "react";
 import { User } from "stream-chat";
@@ -39,19 +40,21 @@ function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <ModelProvider>
-        <div className="h-screen bg-background">
-          {user ? (
-            <AuthenticatedApp 
-              user={user} 
-              onLogout={handleLogout} 
-              onDeleteAccount={handleDeleteAccount}
-            />
-          ) : (
-            <Login onLogin={handleUserLogin} />
-          )}
+        <ProfileProvider>
+          <div className="h-screen bg-background">
+            {user ? (
+              <AuthenticatedApp 
+                user={user} 
+                onLogout={handleLogout} 
+                onDeleteAccount={handleDeleteAccount}
+              />
+            ) : (
+              <Login onLogin={handleUserLogin} />
+            )}
 
-          <Toaster />
-        </div>
+            <Toaster />
+          </div>
+        </ProfileProvider>
       </ModelProvider>
     </ThemeProvider>
   );

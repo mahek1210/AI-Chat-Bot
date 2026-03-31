@@ -13,9 +13,42 @@ import { apiKey, serverClient } from "./serverClient";
 import { getMetrics } from "./metrics";
 import { LLMRequest } from "./llm/types";
 import { AIRouter } from "./services/aiRouter";
+import { BUILT_IN_PROFILES } from "./utils/ai-profiles";
+import jwt from "jsonwebtoken";
+import { readProfiles, writeProfiles } from "./utils/published-profiles";
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: "*" }));
+
+// Extend Express Request type to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: { id: string };
+    }
+  }
+}
+
+// Authentication middleware to verify Stream Chat token
+const authenticateWithStreamToken = (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Unauthorized: Missing Bearer token" });
+  }
+
+  const token = authHeader.split(" ")[1];
+  try {
+    const decoded = jwt.verify(token, process.env.STREAM_API_SECRET as string) as { user_id: string };
+    req.user = { id: decoded.user_id };
+    next();
+  } catch (error) {
+    return res.status(403).json({ error: "Forbidden: Invalid token" });
+  }
+};
 
 // Map to store the AI Agent instances
 // [user_id string]: AI Agent
@@ -71,6 +104,139 @@ app.get("/models", (req, res) => {
       error: "Failed to get supported models",
       reason: error instanceof Error ? error.message : "Unknown error",
     });
+  }
+});
+
+// Get all available AI profiles (built-in + published)
+app.get("/profiles", async (req, res) => {
+  try {
+    const publishedProfiles = await readProfiles();
+    
+    // Deduplicate by ID — built-in wins
+    const builtInIds = new Set(BUILT_IN_PROFILES.map(p => p.id));
+    const filteredPublished = publishedProfiles.filter(p => !builtInIds.has(p.id));
+    
+    let allProfiles = [...BUILT_IN_PROFILES, ...filteredPublished];
+    
+    // Cap at 100 profiles as requested
+    if (allProfiles.length > 100) {
+      allProfiles = allProfiles.slice(0, 100);
+    }
+    
+    res.json({ profiles: allProfiles });
+  } catch (error) {
+    console.error("Error fetching profiles:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Publish a custom profile globally
+app.post("/profiles/publish", authenticateWithStreamToken, async (req, res) => {
+  try {
+    const profile = req.body;
+    
+    if (!profile || !profile.id || !profile.name) {
+      return res.status(400).json({ error: "Invalid profile data" });
+    }
+
+    // Reject if profile ID already exists in BUILT_IN_PROFILES
+    if (BUILT_IN_PROFILES.some(p => p.id === profile.id)) {
+      return res.status(400).json({ error: "Cannot override a built-in profile" });
+    }
+
+    // CRITICAL SECURITY RULE: ownerId must ALWAYS come from req.user
+    profile.ownerId = req.user!.id;
+    profile.isPublished = true;
+
+    // Remove empty systemPrompts if they sneak in
+    if (!profile.systemPrompt || profile.systemPrompt.trim() === '') {
+      return res.status(400).json({ error: "System prompt is required" });
+    }
+
+    const profiles = await readProfiles();
+    
+    // Update or insert
+    const existingIndex = profiles.findIndex(p => p.id === profile.id);
+    if (existingIndex >= 0) {
+      // If it exists, ensure the current user owns it
+      if (profiles[existingIndex].ownerId !== req.user!.id) {
+        return res.status(403).json({ error: "Forbidden: You do not own this profile" });
+      }
+      profiles[existingIndex] = profile;
+    } else {
+      profiles.push(profile);
+    }
+
+    await writeProfiles(profiles);
+    res.json({ message: "Profile published successfully", profile });
+  } catch (error) {
+    console.error("Error publishing profile:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Delete a published custom profile
+app.delete("/profiles/:id", authenticateWithStreamToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const profiles = await readProfiles();
+    
+    const index = profiles.findIndex(p => p.id === id);
+    if (index === -1) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    // CRITICAL SECURITY RULE: ownerId checked against req.user.id
+    if (profiles[index].ownerId !== req.user!.id) {
+      return res.status(403).json({ error: "Forbidden: You do not own this profile" });
+    }
+
+    // Remove from array and save
+    profiles.splice(index, 1);
+    await writeProfiles(profiles);
+    
+    res.json({ message: "Profile deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting profile:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Toggle like on a published profile
+app.post("/profiles/:id/like", authenticateWithStreamToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+    const profiles = await readProfiles();
+    
+    const index = profiles.findIndex(p => p.id === id);
+    if (index === -1) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    const profile = profiles[index];
+    const likedBy: string[] = profile.likedBy || [];
+    const alreadyLiked = likedBy.includes(userId);
+
+    if (alreadyLiked) {
+      // Unlike: remove userId
+      profile.likedBy = likedBy.filter(uid => uid !== userId);
+    } else {
+      // Like: add userId
+      profile.likedBy = [...likedBy, userId];
+    }
+    profile.likes = profile.likedBy.length;
+    profiles[index] = profile;
+
+    await writeProfiles(profiles);
+    res.json({ 
+      liked: !alreadyLiked, 
+      likes: profile.likes,
+      likedBy: profile.likedBy
+    });
+  } catch (error) {
+    console.error("Error toggling like:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -147,8 +313,8 @@ app.get("/test/:model", async (req, res) => {
  * Handle the request to start the AI Agent
  */
 app.post("/start-ai-agent", async (req, res) => {
-  const { channel_id, channel_type = "messaging", model } = req.body;
-  console.log(`[API] /start-ai-agent called for channel: ${channel_id} with model: ${model}`);
+  const { channel_id, channel_type = "messaging", model, profileId, customProfilePrompt } = req.body;
+  console.log(`[API] /start-ai-agent called for channel: ${channel_id} with model: ${model}, profile: ${profileId}`);
 
   // Simple validation
   if (!channel_id) {
@@ -177,7 +343,9 @@ app.post("/start-ai-agent", async (req, res) => {
         AgentPlatform.LLM,
         channel_type,
         channel_id,
-        model
+        model,
+        profileId,
+        customProfilePrompt
       );
 
       await agent.init();
@@ -294,9 +462,12 @@ app.post("/token", async (req, res) => {
       });
     }
 
-    // Create token with expiration (24 hours) and issued at time for security
-    const issuedAt = Math.floor(Date.now() / 1000);
-    const expiration = issuedAt + 24 * 60 * 60; // 24 hours from now
+    // Create token with expiration (24 hours)
+    // Subtract 60s from issuedAt to handle clock skew between this server and Stream's servers
+    // Prevents "token used before issue at (iat)" error (Stream Chat error code 42)
+    const now = Math.floor(Date.now() / 1000);
+    const issuedAt = now - 60; // 60s back-dated to absorb any clock drift
+    const expiration = now + 24 * 60 * 60; // 24 hours from now
 
     const token = serverClient.createToken(userId, expiration, issuedAt);
 

@@ -68,23 +68,47 @@ export class ClaudeService {
         signal: request.abortSignal,
       };
 
+      let contentText = '';
+      let inputTokens = 0;
+      let outputTokens = 0;
+
       if (systemPrompt) {
         createParams.system = systemPrompt;
       }
 
-      const response = await this.client.messages.create(createParams, requestOptions);
-      
-      const firstContent = response.content[0];
-      const contentText = firstContent.type === 'text' ? firstContent.text : '';
+      if (request.onChunk) {
+        const streamOptions: Anthropic.MessageCreateParamsStreaming = {
+          ...createParams,
+          stream: true,
+        };
+        const stream = await this.client.messages.create(streamOptions, requestOptions);
+        
+        for await (const messageStreamEvent of stream) {
+          if (messageStreamEvent.type === 'message_start') {
+             inputTokens = messageStreamEvent.message.usage.input_tokens;
+          } else if (messageStreamEvent.type === 'content_block_delta' && messageStreamEvent.delta.type === 'text_delta') {
+             contentText += messageStreamEvent.delta.text;
+             request.onChunk(messageStreamEvent.delta.text);
+          } else if (messageStreamEvent.type === 'message_delta') {
+             outputTokens = messageStreamEvent.usage.output_tokens;
+          }
+        }
+      } else {
+        const response = await this.client.messages.create(createParams, requestOptions);
+        const firstContent = response.content[0];
+        contentText = firstContent.type === 'text' ? firstContent.text : '';
+        inputTokens = response.usage?.input_tokens || 0;
+        outputTokens = response.usage?.output_tokens || 0;
+      }
       
       console.log(`✅ Claude Service: Successfully generated response with ${modelToTry}`);
       
       return {
         content: contentText,
         usage: {
-          promptTokens: response.usage?.input_tokens || 0,
-          completionTokens: response.usage?.output_tokens || 0,
-          totalTokens: (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0),
+          promptTokens: inputTokens,
+          completionTokens: outputTokens,
+          totalTokens: inputTokens + outputTokens,
         },
         provider: 'claude',
       };

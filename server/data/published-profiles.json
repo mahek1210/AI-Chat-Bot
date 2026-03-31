@@ -1,0 +1,170 @@
+[
+  {
+    "id": "custom_1774603892470",
+    "name": "Test Bot",
+    "emoji": "🤖",
+    "tagline": "Custom Professional AI",
+    "category": "Professional",
+    "systemPrompt": "You are a highly skilled test bot with at least 20 characters of instruction.",
+    "customPrompts": [
+      {
+        "id": "advice",
+        "icon": "💼",
+        "title": "Expert Advice",
+        "prompts": [
+          "What is the single most impactful thing I can do right now as a Test Bot?",
+          "Give me a step-by-step plan to solve my biggest professional challenge",
+          "How would you approach a situation where I need to [describe situation]?",
+          "What are the top 3 mistakes people make in your area of expertise?"
+        ]
+      },
+      {
+        "id": "strategy",
+        "icon": "🎯",
+        "title": "Strategy",
+        "prompts": [
+          "Help me build a 90-day action plan for [your goal]",
+          "What frameworks do you use when analysing a complex problem?",
+          "How do I prioritise when everything feels urgent?",
+          "Walk me through a strategic decision I am facing: [describe it]"
+        ]
+      },
+      {
+        "id": "review",
+        "icon": "🔍",
+        "title": "Review & Feedback",
+        "prompts": [
+          "Review this and tell me what is missing or weak: [paste your work]",
+          "What would a top expert say is wrong with my approach?",
+          "Give me brutally honest feedback on [describe your idea or document]",
+          "How can I make this 10× better? [paste content]"
+        ]
+      },
+      {
+        "id": "growth",
+        "icon": "📈",
+        "title": "Growth",
+        "prompts": [
+          "What skills should I build to reach the next level in this field?",
+          "How do the best people in your domain think differently from average ones?",
+          "What are the hidden knowledge gaps that hold people back?",
+          "Give me a reading/learning list for becoming excellent in your area"
+        ]
+      }
+    ],
+    "ownerId": "user_1caacf9b921e",
+    "isPublished": true
+  },
+  {
+    "id": "custom_1774604067489",
+    "name": "Test Bot",
+    "emoji": "🤖",
+    "tagline": "Custom Professional AI",
+    "category": "Professional",
+    "systemPrompt": "You are a highly skilled test bot with at least 20 characters of instruction.",
+    "customPrompts": [
+      {
+        "id": "advice",
+        "icon": "💼",
+        "title": "Expert Advice",
+        "prompts": [
+          "What is the single most impactful thing I can do right now as a Test Bot?",
+          "Give me a step-by-step plan to solve my biggest professional challenge",
+          "How would you approach a situation where I need to [describe situation]?",
+          "What are the top 3 mistakes people make in your area of expertise?"
+        ]
+      },
+      {
+        "id": "strategy",
+        "icon": "🎯",
+        "title": "Strategy",
+        "prompts": [
+          "Help me build a 90-day action plan for [your goal]",
+          "What frameworks do you use when analysing a complex problem?",
+          "How do I prioritise when everything feels urgent?",
+          "Walk me through a strategic decision I am facing: [describe it]"
+        ]
+      },
+      {
+        "id": "review",
+        "icon": "🔍",
+        "title": "Review & Feedback",
+        "prompts": [
+          "Review this and tell me what is missing or weak: [paste your work]",
+          "What would a top expert say is wrong with my approach?",
+          "Give me brutally honest feedback on [describe your idea or document]",
+          "How can I make this 10× better? [paste content]"
+        ]
+      },
+      {
+        "id": "growth",
+        "icon": "📈",
+        "title": "Growth",
+        "prompts": [
+          "What skills should I build to reach the next level in this field?",
+          "How do the best people in your domain think differently from average ones?",
+          "What are the hidden knowledge gaps that hold people back?",
+          "Give me a reading/learning list for becoming excellent in your area"
+        ]
+      }
+    ],
+    "ownerId": "user_1caacf9b921e",
+    "isPublished": true
+  },
+  {
+    "id": "custom_1774957748999",
+    "name": "Test Publish Persona",
+    "emoji": "🤖",
+    "tagline": "Testing publish flow",
+    "category": "Knowledge",
+    "systemPrompt": "You are a helpful testing assistant. Always respond with 'Test successful!' at the start of your responses. Be helpful and thorough in testing.",
+    "customPrompts": [
+      {
+        "id": "explain",
+        "icon": "🧠",
+        "title": "Explain It",
+        "prompts": [
+          "Explain [complex concept] like I am 12 years old",
+          "What is the most counterintuitive fact in your domain?",
+          "Break down [topic] from first principles",
+          "How does [X] actually work under the hood?"
+        ]
+      },
+      {
+        "id": "deep_dive",
+        "icon": "🔬",
+        "title": "Deep Dive",
+        "prompts": [
+          "Give me the advanced version of [topic] that most people never learn",
+          "What do experts know about [subject] that beginners get wrong?",
+          "Walk me through the history and evolution of [concept]",
+          "What are the open questions or mysteries still unsolved in this field?"
+        ]
+      },
+      {
+        "id": "debate",
+        "icon": "⚖️",
+        "title": "Debate",
+        "prompts": [
+          "Argue both sides of [controversial topic in this domain]",
+          "Steel-man the position I disagree with on [topic]",
+          "What is the strongest argument against your own expertise?",
+          "Where do smart people in your field most commonly disagree?"
+        ]
+      },
+      {
+        "id": "quiz",
+        "icon": "🎓",
+        "title": "Quiz Me",
+        "prompts": [
+          "Quiz me on [topic] — start easy and get progressively harder",
+          "Ask me a question that separates beginners from experts in your field",
+          "Give me a thought experiment related to your area of knowledge",
+          "What is a question in your domain that has no clear right answer?"
+        ]
+      }
+    ],
+    "ownerId": "user_d79aeec77b3b",
+    "isPublished": true
+  }
+]

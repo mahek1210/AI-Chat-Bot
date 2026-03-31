@@ -9,12 +9,15 @@ export const createAgent = async (
   platform: AgentPlatform,
   channel_type: string,
   channel_id: string,
-  model?: string
+  model?: string,
+  profileId?: string,
+  customProfilePrompt?: string
 ): Promise<AIAgent> => {
   const token = serverClient.createToken(user_id);
   // This is the client for the AI bot user
   const chatClient = new StreamChat(apiKey, undefined, {
     allowServerSideConnect: true,
+    timeout: 15000,
   });
 
   await chatClient.connectUser({ id: user_id }, token);
@@ -26,7 +29,7 @@ export const createAgent = async (
     case AgentPlatform.OPENAI:
       return new OpenAIAgent(chatClient, channel);
     case AgentPlatform.LLM:
-      return new LLMAgent(chatClient, channel, model);
+      return new LLMAgent(chatClient, channel, model, profileId, customProfilePrompt);
     default:
       throw new Error(`Unsupported agent platform: ${platform}`);
   }

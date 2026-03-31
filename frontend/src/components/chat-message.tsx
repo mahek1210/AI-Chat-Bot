@@ -8,19 +8,12 @@ import {
   useAIState,
   useChannelStateContext,
   useMessageContext,
-  useMessageTextStreaming,
 } from "stream-chat-react";
 
 const ChatMessage: React.FC = () => {
   const { message } = useMessageContext();
   const { channel } = useChannelStateContext();
   const { aiState } = useAIState(channel);
-
-  const { streamedMessageText } = useMessageTextStreaming({
-    text: message.text ?? "",
-    renderingLetterCount: 10,
-    streamingLetterIntervalMs: 50,
-  });
 
   const isUser = !message.user?.id?.startsWith("ai-bot");
   const [copied, setCopied] = useState(false);
@@ -29,7 +22,7 @@ const ChatMessage: React.FC = () => {
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const copyToClipboard = async () => {
-    const textToCopy = streamedMessageText || message.text || "";
+    const textToCopy = message.text || "";
     if (!textToCopy) return;
 
     try {
@@ -71,7 +64,7 @@ const ChatMessage: React.FC = () => {
       return;
     }
 
-    const text = streamedMessageText || message.text || "";
+    const text = message.text || "";
     if (!text.trim()) return;
 
     // Stop any ongoing speech before starting this one
@@ -398,14 +391,14 @@ const ChatMessage: React.FC = () => {
                   em: ({ children }) => <em className="italic">{children}</em>,
                 }}
               >
-                {streamedMessageText || message.text || ""}
+                {message.text || ""}
               </ReactMarkdown>
             </div>
 
             {renderUsage()}
 
             {/* Loading State */}
-            {aiState && !streamedMessageText && !message.text && (
+            {aiState && !message.text && (
               <div className="flex items-center gap-2 mt-2 pt-2">
                 <span className="text-xs opacity-70">
                   {getAiStateMessage()}
@@ -427,7 +420,7 @@ const ChatMessage: React.FC = () => {
             </span>
 
             {/* Actions - Only for AI messages, always right aligned */}
-            {!isUser && !!(streamedMessageText || message.text) && (
+            {!isUser && !!(message.text) && (
               <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1">
                 <Button
                   variant="ghost"

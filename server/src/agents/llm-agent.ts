@@ -5,22 +5,29 @@ import { estimateCostUSD } from "../llm/pricing";
 import { recordRequest } from "../metrics";
 import { AIRouter } from "../services/aiRouter";
 import { getRandomAbortQuote } from "../utils/funny-quotes";
+import { getProfileById, BUILT_IN_PROFILES } from "../utils/ai-profiles";
 
 export class LLMAgent implements AIAgent {
   private aiRouter: AIRouter;
   private lastInteractionTs = Date.now();
   private defaultModel: string;
   private provider: string;
+  private profileId: string;
+  private customProfilePrompt: string | undefined;
 
   constructor(
     readonly chatClient: StreamChat,
     readonly channel: Channel,
-    model?: string
+    model?: string,
+    profileId?: string,
+    customProfilePrompt?: string
   ) {
     this.aiRouter = new AIRouter();
     this.defaultModel = model || this.aiRouter.getDefaultModel();
     // Store the provider based on the model for future messages
     this.provider = model ? this.aiRouter.detectProvider(model) : 'openai';
+    this.profileId = profileId || 'writing_coach';
+    this.customProfilePrompt = customProfilePrompt;
   }
 
   /**
@@ -54,6 +61,28 @@ export class LLMAgent implements AIAgent {
 
   init = async () => {
     this.chatClient.on("message.new", this.handleMessage);
+  };
+
+  private getSystemPrompt = (context?: string): string => {
+    // Use custom profile prompt if provided
+    if (this.customProfilePrompt) {
+      return this.customProfilePrompt;
+    }
+    
+    // Look up profile by ID
+    const profile = getProfileById(this.profileId);
+    if (profile) {
+      // Inject current date into all profiles
+      const currentDate = new Date().toLocaleDateString("en-US", {
+        year: "numeric", month: "long", day: "numeric",
+      });
+      const basePrompt = profile.systemPrompt.replace('{{date}}', currentDate);
+      if (context) return `${basePrompt}\n\n**Additional Context**: ${context}`;
+      return basePrompt;
+    }
+    
+    // Fallback to default writing prompt
+    return this.getWritingAssistantPrompt(context);
   };
 
   private getWritingAssistantPrompt = (context?: string): string => {
@@ -98,7 +127,7 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
     const writingTask = (e.message.custom as { writingTask?: string })
       ?.writingTask;
     const context = writingTask ? `Writing Task: ${writingTask}` : undefined;
-    const systemPrompt = this.getWritingAssistantPrompt(context);
+    const systemPrompt = this.getSystemPrompt(context);
 
     // Extract model from message custom field if provided, otherwise use the agent's default model
     const model = (e.message.custom as { model?: string })?.model || this.defaultModel;
@@ -109,6 +138,11 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
     // Ensure model is always provided
     if (!model) {
       throw new Error("Model is required but not provided in request or agent configuration");
+    }
+
+    // Auto-generate a title if the channel doesn't have a specific name
+    if (!this.channel.data?.name || this.channel.data.name.includes("!members")) {
+      this.generateAndSetChannelTitle(message).catch(e => console.error("Title generation failed:", e));
     }
 
     const { message: channelMessage } = await this.channel.sendMessage({
@@ -149,14 +183,27 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
       // Handle multiple rounds of function calling
       let round = 0;
       const maxRounds = 3;
+      let lastUpdateTs = 0;
+      let streamedResponse = '';
 
       const startedAt = Date.now();
       while (round < maxRounds) {
+        streamedResponse = ''; // Reset for this round
         const llmRequest: LLMRequest = {
           messages,
           model,
           temperature: 0.7,
           abortSignal: abortController.signal,
+          onChunk: (chunk: string) => {
+            streamedResponse += chunk;
+            const now = Date.now();
+            if (now - lastUpdateTs > 150) {
+              lastUpdateTs = now;
+              this.chatClient.partialUpdateMessage(channelMessage.id, {
+                set: { text: streamedResponse }
+              }).catch(e => console.warn("Stream update error:", e.message));
+            }
+          },
           tools: round === 0 ? [
             {
               type: "function",
@@ -393,6 +440,32 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
         error: "An exception occurred during the search.",
         message: error instanceof Error ? error.message : "Unknown error",
       });
+    }
+  };
+
+  private generateAndSetChannelTitle = async (firstMessage: string) => {
+    try {
+      console.log(`📝 Generating title for new channel based on message: "${firstMessage.substring(0, 30)}..."`);
+      const defaultModel = this.aiRouter.getDefaultModel();
+      const request: LLMRequest = {
+        model: defaultModel,
+        messages: [
+          { role: 'system', content: 'You are a highly concise channel title generator. You must return exactly 2 to 4 words representing the core topic of the user\'s prompt. Be direct and creative. No quotes, no punctuation, no preamble. Just the title in Title Case.' },
+          { role: 'user', content: firstMessage }
+        ],
+        temperature: 0.5,
+        maxTokens: 15
+      };
+      
+      const response = await this.aiRouter.routeRequest(request);
+      const generatedTitle = response.content.trim().replace(/^["']|["']$/g, '');
+      
+      console.log(`✅ Generated title: "${generatedTitle}"`);
+      if (generatedTitle) {
+        await this.channel.updatePartial({ set: { name: generatedTitle } });
+      }
+    } catch (e) {
+      console.error("Failed to generate and set channel title:", e);
     }
   };
 }
