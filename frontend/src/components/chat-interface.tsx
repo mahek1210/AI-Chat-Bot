@@ -26,7 +26,7 @@ import {
 import { AIAgentControl } from "./ai-agent-control";
 import { ChatInput, ChatInputProps } from "./chat-input";
 import ChatMessage from "./chat-message";
-import { ModelSelector } from "./model-selector";
+import { ModelSelector, MODEL_OPTIONS } from "./model-selector";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
@@ -320,32 +320,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const sessionProfileEmoji: string = channelData?.profileEmoji || activeProfile.emoji;
   const isSessionPersonaDeleted = channel && sessionProfileId ? isPersonaDeleted(sessionProfileId) : false;
 
-  // When persona changes within the SAME session category, update the channel's emoji trail
-  useEffect(() => {
-    if (!channel) return;
-    const channelData = channel.data as any;
-    // Only update if category matches (same-category permissible switch)
-    if (channelData?.profileCategory !== activeProfile.category) return;
-    const existing: string[] = channelData?.usedProfileEmojis || [];
-    if (!existing.includes(activeProfile.emoji)) {
-      const updated = [...existing, activeProfile.emoji];
-      channel.update({
-        ...channelData,
-        profileId: activeProfile.id,
-        profileEmoji: activeProfile.emoji,
-        profileName: activeProfile.name,
-        usedProfileEmojis: updated,
-      } as any).catch(() => {/* ignore update errors */});
-    } else {
-      // Still update current active profileId so the header reflects the switch
-      channel.update({
-        ...channelData,
-        profileId: activeProfile.id,
-        profileEmoji: activeProfile.emoji,
-        profileName: activeProfile.name,
-      } as any).catch(() => {});
-    }
-  }, [activeProfile.id, channel?.id]);
+  // (Emoji trail effect removed as per strict persona isolation)
 
   // Handle model changes automatically when agent is connected
   const handleModelChange = async (newModel: string) => {
@@ -424,7 +399,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             variant="ghost"
             size="icon"
             onClick={onToggleSidebar}
-            className="lg:hidden h-9 w-9"
+            className="h-9 w-9 shrink-0"
+            title="Toggle Sidebar"
           >
             <Menu className="h-4 w-4" />
           </Button>
@@ -437,24 +413,29 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 <ConnectionStatusDot className="absolute -top-1 -right-1" />
               )}
             </div>
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">
-                {channel?.data?.name || `New ${activeProfile.name} Session`}
+            <div className="flex-1 min-w-0">
+              <h2 className="text-sm font-semibold text-foreground truncate">
+                {channel?.data?.name || `New ${sessionProfileName} Session`}
               </h2>
               <p className={cn(
-                "text-xs",
+                "text-xs flex items-center gap-1 overflow-hidden",
                 isSessionPersonaDeleted
                   ? "text-amber-500/80"
                   : "text-muted-foreground"
               )}>
                 {isSessionPersonaDeleted ? (
-                  <span className="flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" />
-                    <span className="line-through opacity-60">{sessionProfileEmoji} {sessionProfileName}</span>
-                    <span className="ml-1 not-italic">• Persona removed</span>
+                  <span className="flex items-center gap-1 overflow-hidden">
+                    <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                    <span className="line-through opacity-60 truncate">{sessionProfileEmoji} {sessionProfileName}</span>
+                    <span className="ml-1 not-italic flex-shrink-0">• Persona removed</span>
                   </span>
                 ) : (
-                  <>{activeProfile.emoji} {activeProfile.name} • {selectedModel || "Default Model"}</>
+                  <>
+                    <span className="flex-shrink-0">{sessionProfileEmoji}</span>
+                    <span className="truncate max-w-[100px] sm:max-w-none">{sessionProfileName}</span>
+                    <span className="flex-shrink-0 text-muted-foreground/50">•</span>
+                    <span className="truncate">{(MODEL_OPTIONS.find(opt => opt.value === (channelData?.model || selectedModel))?.label) || channelData?.model || selectedModel || "Default Model"}</span>
+                  </>
                 )}
               </p>
             </div>

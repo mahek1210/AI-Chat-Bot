@@ -14,41 +14,29 @@ import { getMetrics } from "./metrics";
 import { LLMRequest } from "./llm/types";
 import { AIRouter } from "./services/aiRouter";
 import { BUILT_IN_PROFILES } from "./utils/ai-profiles";
-import jwt from "jsonwebtoken";
 import { readProfiles, writeProfiles } from "./utils/published-profiles";
+import { requireAuth } from "./middleware/requireAuth";
+import personaRoutes from "./routes/personas";
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: "*" }));
+
+// ─── Supabase-backed Persona Routes ────────────────────────────────────────
+// Phase 6: All /api/personas/* calls are now handled by the DB-backed router.
+app.use('/api/personas', personaRoutes);
 
 // Extend Express Request type to include user
 declare global {
   namespace Express {
     interface Request {
       user?: { id: string };
+      supabaseUser?: { id: string; email?: string; user_metadata?: Record<string, unknown> };
     }
   }
 }
 
-// Authentication middleware to verify Stream Chat token
-const authenticateWithStreamToken = (
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction
-) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Unauthorized: Missing Bearer token" });
-  }
-
-  const token = authHeader.split(" ")[1];
-  try {
-    const decoded = jwt.verify(token, process.env.STREAM_API_SECRET as string) as { user_id: string };
-    req.user = { id: decoded.user_id };
-    next();
-  } catch (error) {
-    return res.status(403).json({ error: "Forbidden: Invalid token" });
-  }
-};
+// (Old Stream JWT auth kept as fallback for legacy endpoints only)
+const authenticateWithStreamToken = requireAuth;
 
 // Map to store the AI Agent instances
 // [user_id string]: AI Agent
@@ -571,4 +559,4 @@ async function testAllModels() {
   } catch (error) {
     console.error('Error during model testing:', error);
   }
-}
+} //

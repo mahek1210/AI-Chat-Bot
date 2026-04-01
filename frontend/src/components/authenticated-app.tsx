@@ -9,16 +9,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Channel, ChannelFilters, ChannelSort, User } from "stream-chat";
 import { useChatContext } from "stream-chat-react";
 import { v4 as uuidv4 } from "uuid";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { ChatProvider } from "../providers/chat-provider";
 import { ChatInterface } from "./chat-interface";
 import { ChatSidebar } from "./chat-sidebar";
 import { useModel } from "@/contexts/model-context";
 import { useProfile } from "@/contexts/profile-context";
+import { apiFetch } from "@/lib/api";
 
 // ── Auto-title helper ────────────────────────────────────────────────────────
 // Generates a concise title from the first user message (runs client-side,
@@ -35,6 +37,7 @@ interface AuthenticatedAppProps {
   user: User;
   onLogout: () => void;
   onDeleteAccount: () => void;
+  supabaseToken?: string; // Supabase access token for authenticated API calls
 }
 
 export const AuthenticatedApp = ({ user, onLogout, onDeleteAccount }: AuthenticatedAppProps) => (
@@ -45,6 +48,8 @@ export const AuthenticatedApp = ({ user, onLogout, onDeleteAccount }: Authentica
 
 const AuthenticatedCore = ({ user, onLogout, onDeleteAccount }: AuthenticatedAppProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const sidebarPanelRef = useRef<any>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
@@ -86,15 +91,16 @@ const AuthenticatedCore = ({ user, onLogout, onDeleteAccount }: AuthenticatedApp
       // Use the selected model from the hook called at component level
       console.log("Selected model in frontend:", selectedModel);
 
+      const generatedTitle = generateTitle(message.text);
+
       // 1. Create a new channel with the user as the only member + persona metadata
       const newChannel = client.channel("messaging", uuidv4(), {
-        name: `New ${activeProfile.name} Session`,
+        name: generatedTitle || `New ${activeProfile.name} Session`,
         members: [user.id],
         profileId: activeProfile.id,
         profileEmoji: activeProfile.emoji,
         profileName: activeProfile.name,
         profileCategory: activeProfile.category,
-        usedProfileEmojis: [activeProfile.emoji],
       });
       await newChannel.watch();
 
@@ -111,9 +117,8 @@ const AuthenticatedCore = ({ user, onLogout, onDeleteAccount }: AuthenticatedApp
 
       // 3. Connect the AI agent
       console.log("Sending request with model:", selectedModel);
-      const response = await fetch(`${backendUrl}/start-ai-agent`, {
+      const response = await apiFetch('/start-ai-agent', {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           channel_id: newChannel.id,
           channel_type: "messaging",
@@ -140,17 +145,7 @@ const AuthenticatedCore = ({ user, onLogout, onDeleteAccount }: AuthenticatedApp
         },
       });
 
-      // 6. Auto-generate a title from the first message and update the channel
-      if (newChannel.state.messages.length === 1) {
-        try {
-          const generatedTitle = generateTitle(message.text);
-          await newChannel.update({ name: generatedTitle });
-          console.log("Chat title auto-generated:", generatedTitle);
-        } catch (err) {
-          console.error('Title update failed:', err);
-          // Do NOT crash the chat — swallow the error silently
-        }
-      }
+
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Something went wrong";
@@ -243,22 +238,68 @@ const AuthenticatedCore = ({ user, onLogout, onDeleteAccount }: AuthenticatedApp
   const options = { state: true, presence: true, limit: 10 };
 
   return (
-    <div className="flex h-full w-full">
-      <ChatSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        onLogout={onLogout}
-        onNewChat={handleNewChatClick}
-        onChannelDelete={handleDeleteClick}
-        onDeleteAccount={handleDeleteAccountClick}
-      />
-      <div className="flex-1 flex flex-col min-w-0">
-        <ChatInterface
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          onNewChatMessage={handleNewChatMessage}
-          backendUrl={backendUrl}
+    <div className="flex h-full w-full overflow-hidden">
+      {/* Mobile-only Sidebar Drawer */}
+      <div className="lg:hidden">
+        <ChatSidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          onLogout={onLogout}
+          onNewChat={handleNewChatClick}
+          onChannelDelete={handleDeleteClick}
+          onDeleteAccount={handleDeleteAccountClick}
         />
       </div>
+
+      <PanelGroup direction="horizontal" className="h-full w-full">
+        {/* Desktop Resizable Sidebar Panel */}
+        <Panel
+          ref={sidebarPanelRef}
+          defaultSize={25}
+          minSize={15}
+          maxSize={40}
+          collapsible={true}
+          collapsedSize={0}
+          onCollapse={() => setSidebarCollapsed(true)}
+          onExpand={() => setSidebarCollapsed(false)}
+          className="hidden lg:block z-10"
+        >
+          <ChatSidebar
+            isOpen={true}
+            onClose={() => sidebarPanelRef.current?.collapse()}
+            onLogout={onLogout}
+            onNewChat={handleNewChatClick}
+            onChannelDelete={handleDeleteClick}
+            onDeleteAccount={handleDeleteAccountClick}
+          />
+        </Panel>
+
+        {!sidebarCollapsed && (
+          <PanelResizeHandle className="hidden lg:flex w-1 bg-border/40 hover:bg-primary/50 transition-colors cursor-col-resize relative z-20 after:absolute after:inset-y-0 after:-inset-x-2" />
+        )}
+
+        <Panel className="flex-1 flex flex-col min-w-0 h-full relative z-0">
+          <ChatInterface
+            onToggleSidebar={() => {
+              if (window.innerWidth >= 1024) {
+                // Desktop toggle
+                if (sidebarPanelRef.current) {
+                  if (sidebarPanelRef.current.isCollapsed()) {
+                    sidebarPanelRef.current.expand();
+                  } else {
+                    sidebarPanelRef.current.collapse();
+                  }
+                }
+              } else {
+                // Mobile toggle
+                setSidebarOpen(!sidebarOpen);
+              }
+            }}
+            onNewChatMessage={handleNewChatMessage}
+            backendUrl={backendUrl}
+          />
+        </Panel>
+      </PanelGroup>
 
       {/* Delete Chat Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

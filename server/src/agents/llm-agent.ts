@@ -6,6 +6,9 @@ import { recordRequest } from "../metrics";
 import { AIRouter } from "../services/aiRouter";
 import { getRandomAbortQuote } from "../utils/funny-quotes";
 import { getProfileById, BUILT_IN_PROFILES } from "../utils/ai-profiles";
+import { MemoryClient } from "mem0ai";
+
+const mem0 = process.env.MEM0_API_KEY ? new MemoryClient({ apiKey: process.env.MEM0_API_KEY }) : null;
 
 export class LLMAgent implements AIAgent {
   private aiRouter: AIRouter;
@@ -64,9 +67,11 @@ export class LLMAgent implements AIAgent {
   };
 
   private getSystemPrompt = (context?: string): string => {
+    const lengthConstraint = "\n\nCRITICAL RULE: Never exceed 800 words in a single response under any circumstances. If the user's request requires more detail, truncate your response naturally and ask the user if they would like you to continue.";
+
     // Use custom profile prompt if provided
     if (this.customProfilePrompt) {
-      return this.customProfilePrompt;
+      return this.customProfilePrompt + lengthConstraint;
     }
     
     // Look up profile by ID
@@ -77,12 +82,13 @@ export class LLMAgent implements AIAgent {
         year: "numeric", month: "long", day: "numeric",
       });
       const basePrompt = profile.systemPrompt.replace('{{date}}', currentDate);
-      if (context) return `${basePrompt}\n\n**Additional Context**: ${context}`;
-      return basePrompt;
+      let finalPrompt = basePrompt;
+      if (context) finalPrompt = `${finalPrompt}\n\n**Additional Context**: ${context}`;
+      return finalPrompt + lengthConstraint;
     }
     
     // Fallback to default writing prompt
-    return this.getWritingAssistantPrompt(context);
+    return this.getWritingAssistantPrompt(context) + lengthConstraint;
   };
 
   private getWritingAssistantPrompt = (context?: string): string => {
@@ -123,11 +129,44 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
     if (!message) return;
 
     this.lastInteractionTs = Date.now();
+    const userId = e.message.user?.id || 'default';
 
     const writingTask = (e.message.custom as { writingTask?: string })
       ?.writingTask;
     const context = writingTask ? `Writing Task: ${writingTask}` : undefined;
-    const systemPrompt = this.getSystemPrompt(context);
+    let systemPrompt = this.getSystemPrompt(context);
+
+    // --- LAYER 2: Long-term Memory (Mem0) ---
+    if (mem0) {
+      try {
+        const memories = await mem0.search(message, { user_id: userId });
+        if (memories && memories.length > 0) {
+          systemPrompt += "\n\n**User Memory (from past conversations):**\n" + 
+            memories.map((m: any) => `- ${m.memory}`).join('\n');
+          console.log(`🧠 Mem0: Loaded ${memories.length} memories for user ${userId}`);
+        }
+      } catch (err: any) {
+        console.error("Mem0 search failed:", err.message);
+      }
+    }
+
+    // --- LAYER 1: Short-term Memory (Stream Chat History) ---
+    let historyMessages: LLMMessage[] = [];
+    try {
+      const channelState = await this.channel.query({ messages: { limit: 20 } });
+      const recentMessages = channelState.messages || [];
+      
+      for (const msg of recentMessages) {
+        if (!msg.text) continue;
+        if (msg.id === e.message.id) continue; // Skip the current user message being processed
+        
+        const role = msg.user?.id?.startsWith('ai-bot') ? 'assistant' : 'user';
+        historyMessages.push({ role, content: msg.text });
+      }
+      console.log(`📜 Stream History: Loaded ${historyMessages.length} recent messages for context.`);
+    } catch (err: any) {
+      console.error("Stream history fetch failed:", err.message);
+    }
 
     // Extract model from message custom field if provided, otherwise use the agent's default model
     const model = (e.message.custom as { model?: string })?.model || this.defaultModel;
@@ -169,6 +208,7 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
     try {
       const messages: LLMMessage[] = [
         { role: 'system', content: systemPrompt },
+        ...historyMessages,
         { role: 'user', content: message }
       ];
 
@@ -368,6 +408,19 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
         cid: channelMessage.cid,
         message_id: channelMessage.id,
       });
+
+      // --- Save to Long-Term Memory (Mem0) ---
+      if (mem0) {
+        try {
+          await mem0.add([
+            { role: 'user', content: message },
+            { role: 'assistant', content: finalResponse }
+          ], { user_id: userId });
+          console.log(`💾 Mem0: Saved conversation to long-term memory for user ${userId}`);
+        } catch (memErr: any) {
+          console.error("Failed to save memory to mem0:", memErr.message);
+        }
+      }
 
     } catch (error) {
       console.error("Error generating response:", error);

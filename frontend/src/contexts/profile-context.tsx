@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { BUILT_IN_PROFILES, AIProfile } from '../data/ai-profiles';
+import { apiGet, apiPost, apiDelete } from '../lib/api';
 
 const CUSTOM_PROFILES_KEY = 'ai_custom_profiles_v2';
 const ACTIVE_PROFILE_KEY = 'ai_active_profile';
@@ -68,15 +69,17 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // 2. Fetch global profiles
+  // 2. Fetch global published personas from Supabase DB
   useEffect(() => {
     const fetchProfiles = async () => {
       try {
-        const backendUrl = import.meta.env.VITE_BACKEND_URL;
-        const res = await fetch(`${backendUrl}/profiles`, { cache: 'no-store' });
+        const res = await apiGet('/api/personas/published');
         if (res.ok) {
           const data = await res.json();
-          setFetchedProfiles(data.profiles || BUILT_IN_PROFILES);
+          // Merge: built-ins first, then DB-published (deduplicated)
+          const builtInIds = new Set(BUILT_IN_PROFILES.map(p => p.id));
+          const dbOnly = (data.personas || []).filter((p: AIProfile) => !builtInIds.has(p.id));
+          setFetchedProfiles([...BUILT_IN_PROFILES, ...dbOnly]);
         }
       } catch (err) {
         console.error("Failed to load global profiles:", err);
@@ -128,18 +131,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   };
 
   const publishProfile = async (profile: AIProfile) => {
-    const token = localStorage.getItem('stream_jwt_token');
-    if (!token) throw new Error("Authentication missing");
-    
-    const backendUrl = import.meta.env.VITE_BACKEND_URL;
-    const res = await fetch(`${backendUrl}/profiles/publish`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify(profile)
-    });
+    const res = await apiPost('/api/personas/publish', profile);
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -154,15 +146,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setCustomProfiles(updatedCustom);
     localStorage.setItem(CUSTOM_PROFILES_KEY, JSON.stringify(updatedCustom));
 
-    // Step 2: Refresh global profiles from server
-    const refreshRes = await fetch(`${backendUrl}/profiles`, { cache: 'no-store' });
+    // Step 2: Refresh global profiles from DB
+    const refreshRes = await apiGet('/api/personas/published');
     if (refreshRes.ok) {
       const data = await refreshRes.json();
-      const newFetched: AIProfile[] = data.profiles || BUILT_IN_PROFILES;
+      const builtInIds = new Set(BUILT_IN_PROFILES.map(p => p.id));
+      const dbOnly = (data.personas || []).filter((p: AIProfile) => !builtInIds.has(p.id));
+      const newFetched = [...BUILT_IN_PROFILES, ...dbOnly];
       setFetchedProfiles(newFetched);
 
-      // Step 3: If the published profile was active, update active profile pointer
-      // to the freshly published version (has correct isPublished:true and ownerId)
       if (activeProfile.id === profile.id) {
         const publishedVersion = newFetched.find(p => p.id === profile.id) || publishedProfile;
         if (publishedVersion) {
@@ -174,42 +166,29 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   };
 
   const deletePublishedProfile = async (id: string) => {
-    const token = localStorage.getItem('stream_jwt_token');
-    if (!token) throw new Error("Authentication missing");
-    
-    const backendUrl = import.meta.env.VITE_BACKEND_URL;
-    const res = await fetch(`${backendUrl}/profiles/${id}`, {
-      method: "DELETE",
-      headers: {
-        "Authorization": `Bearer ${token}`
-      }
-    });
+    const res = await apiDelete(`/api/personas/${id}`);
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.error || "Failed to delete profile");
     }
 
-    // Refresh profiles
-    const refreshRes = await fetch(`${backendUrl}/profiles`, { cache: 'no-store' });
+    // Refresh profiles from DB
+    const refreshRes = await apiGet('/api/personas/published');
     if (refreshRes.ok) {
       const data = await refreshRes.json();
-      setFetchedProfiles(data.profiles || BUILT_IN_PROFILES);
+      const builtInIds = new Set(BUILT_IN_PROFILES.map(p => p.id));
+      const dbOnly = (data.personas || []).filter((p: AIProfile) => !builtInIds.has(p.id));
+      const newFetched = [...BUILT_IN_PROFILES, ...dbOnly];
+      setFetchedProfiles(newFetched);
       if (activeProfile.id === id) {
-        setActiveProfile(data.profiles?.[0] || BUILT_IN_PROFILES[0]);
+        setActiveProfile(newFetched[0] || BUILT_IN_PROFILES[0]);
       }
     }
   };
 
   const likeProfile = async (profileId: string) => {
-    const token = localStorage.getItem('stream_jwt_token');
-    if (!token) throw new Error("Authentication missing");
-
-    const backendUrl = import.meta.env.VITE_BACKEND_URL;
-    const res = await fetch(`${backendUrl}/profiles/${profileId}/like`, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${token}` }
-    });
+    const res = await apiPost(`/api/personas/${profileId}/like`, {});
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -217,10 +196,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
 
     // Refresh to get updated like counts
-    const refreshRes = await fetch(`${backendUrl}/profiles`, { cache: 'no-store' });
+    const refreshRes = await apiGet('/api/personas/published');
     if (refreshRes.ok) {
       const data = await refreshRes.json();
-      setFetchedProfiles(data.profiles || BUILT_IN_PROFILES);
+      const builtInIds = new Set(BUILT_IN_PROFILES.map(p => p.id));
+      const dbOnly = (data.personas || []).filter((p: AIProfile) => !builtInIds.has(p.id));
+      setFetchedProfiles([...BUILT_IN_PROFILES, ...dbOnly]);
     }
   };
 

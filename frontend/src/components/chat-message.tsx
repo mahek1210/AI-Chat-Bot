@@ -9,6 +9,7 @@ import {
   useChannelStateContext,
   useMessageContext,
 } from "stream-chat-react";
+import { MODEL_OPTIONS } from "./model-selector";
 
 const ChatMessage: React.FC = () => {
   const { message } = useMessageContext();
@@ -178,20 +179,46 @@ const ChatMessage: React.FC = () => {
           latencyMs?: number;
         }
       | undefined;
-    if (!usage) return null;
-    
-    // Fallback to avoid empty stats when processing
-    const totalTokens = usage.totalTokens || 0;
-    const cost = typeof usage.costUSD === "number" ? (usage.costUSD === 0 ? "Free" : `$${usage.costUSD.toFixed(4)}`) : "-";
-    const latency = typeof usage.latencyMs === "number" ? `${(usage.latencyMs / 1000).toFixed(2)}s` : "-";
-    
+      
+    const providerInfo = getProviderInfo();
+    const modelValue = providerInfo.model || rootMessage?.custom?.model || "";
+    const displayModelName = MODEL_OPTIONS.find(opt => opt.value === modelValue)?.label || modelValue || "AI";
+    const currentProviderDisplay = getProviderDisplay(providerInfo.provider || "");
+
+    const totalTokens = usage?.totalTokens || 0;
+    const cost = usage && typeof usage.costUSD === "number" ? (usage.costUSD === 0 ? "Free" : `$${usage.costUSD.toFixed(4)}`) : "-";
+    const latency = usage && typeof usage.latencyMs === "number" ? `${(usage.latencyMs / 1000).toFixed(2)}s` : "-";
+
+    const isFallback = providerInfo.fallbackUsed;
+
     return (
-      <div className="mt-1 flex gap-2 text-[11px] font-mono text-muted-foreground/80">
-        <span>Tokens: {totalTokens > 0 ? totalTokens : "Computing..."}</span>
-        <span className="opacity-50">|</span>
-        <span>Cost: {cost}</span>
-        <span className="opacity-50">|</span>
-        <span>Latency: {latency}</span>
+      <div className={cn(
+        "mt-3 pt-2 border-t flex flex-wrap items-center gap-2 text-[11px] select-none",
+        isFallback ? "border-amber-500/20" : "border-border/30"
+      )}>
+        {/* Model ID Badge */}
+        <div className={cn(
+          "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-medium",
+          isFallback 
+            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shadow-sm shadow-amber-500/5" 
+            : "bg-muted text-muted-foreground border border-muted-foreground/10"
+        )}>
+          {isFallback ? (
+            <AlertTriangle className="h-3 w-3" />
+          ) : (
+            <span>{currentProviderDisplay.icon}</span>
+          )}
+          <span>{isFallback ? `Fallback: ${displayModelName}` : displayModelName}</span>
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center gap-2 font-mono text-muted-foreground/70">
+          <span>Tokens: {totalTokens > 0 ? totalTokens : "..."}</span>
+          <span className="opacity-40">•</span>
+          <span>Cost: {cost}</span>
+          <span className="opacity-40">•</span>
+          <span>Latency: {latency}</span>
+        </div>
       </div>
     );
   };
@@ -222,102 +249,7 @@ const ChatMessage: React.FC = () => {
 
         {/* Message Content */}
         <div className="flex flex-col space-y-1">
-          {/* Provider Information - Only for AI messages */}
-          {!isUser && (() => {
-            const providerInfo = getProviderInfo();
-            if (!providerInfo.provider) return null;
-            
-            const currentProviderDisplay = getProviderDisplay(providerInfo.provider);
-            const originalProviderDisplay = providerInfo.originalProvider ? getProviderDisplay(providerInfo.originalProvider) : null;
-            
-            return (
-              <div className="mb-2">
-                {/* Main Provider Badge */}
-                <div className="flex items-center gap-2 mb-1">
-                  <div className={cn(
-                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
-                    "bg-muted/50 border border-muted-foreground/20",
-                    currentProviderDisplay.color
-                  )}>
-                    <span>{currentProviderDisplay.icon}</span>
-                    <span>{currentProviderDisplay.name}</span>
-                    {providerInfo.fallbackUsed && (
-                      <span title="Fallback used">
-                        <Zap className="h-3 w-3 text-amber-500" />
-                      </span>
-                    )}
-
-                  </div>
-                  
-                  {/* Fallback Indicator */}
-                  {providerInfo.fallbackUsed && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowFallbackDetails(!showFallbackDetails)}
-                      className="h-6 px-2 text-xs hover:bg-muted/50 rounded-md"
-                    >
-                      <AlertTriangle className="h-3 w-3 mr-1 text-amber-500" />
-                      <span className="text-amber-600">Fallback used</span>
-                      {showFallbackDetails ? (
-                        <ChevronUp className="h-3 w-3 ml-1" />
-                      ) : (
-                        <ChevronDown className="h-3 w-3 ml-1" />
-                      )}
-                    </Button>
-                  )}
-                </div>
-
-                {/* Fallback Details - Expandable */}
-                {providerInfo.fallbackUsed && showFallbackDetails && (
-                  <div className="bg-muted/30 border border-muted-foreground/10 rounded-lg p-3 text-xs space-y-2">
-                    <div className="font-medium text-muted-foreground mb-2">
-                      🔄 Fallback Details
-                    </div>
-                    
-                    {/* Original attempt */}
-                    {originalProviderDisplay && (
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <span>{originalProviderDisplay.icon}</span>
-                          <span>{originalProviderDisplay.name}</span>
-                        </div>
-                        <span className="text-muted-foreground">→</span>
-                        <div className="flex items-center gap-1">
-                          {(() => {
-                            const reasonDisplay = getFallbackReasonDisplay(providerInfo.fallbackReason || '');
-                            return (
-                              <>
-                                <span className={reasonDisplay.color}>
-                                  {reasonDisplay.icon}
-                                </span>
-                                <span className={cn("text-xs", reasonDisplay.color)}>
-                                  {reasonDisplay.text}
-                                </span>
-                              </>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Successful fallback */}
-                    <div className="flex items-center gap-2">
-                      <RefreshCw className="h-3 w-3 text-green-600" />
-                      <span className="text-green-600">Successfully switched to {currentProviderDisplay.name}</span>
-                    </div>
-                    
-                    {/* Model info */}
-                    {providerInfo.model && (
-                      <div className="text-muted-foreground/80 text-xs">
-                        Model: <code className="bg-muted/50 px-1 py-0.5 rounded text-xs">{providerInfo.model}</code>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+          {/* Message Bubble gets Top Provider badge removed to make UI clean */}
 
           {/* Message Bubble */}
           <div

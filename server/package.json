@@ -19,6 +19,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.101.1",
     "@types/bcryptjs": "^3.0.0",
     "@types/cookie-parser": "^1.4.9",
     "@types/jsonwebtoken": "^9.0.10",
@@ -30,6 +31,7 @@
     "express": "^4.19.2",
     "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.2",
+    "mem0ai": "^2.4.4",
     "mongoose": "^8.18.0",
     "openai": "^4.73.1",
     "stream-chat": "^8.46.0",

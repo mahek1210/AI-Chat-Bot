@@ -84,16 +84,16 @@ export const ChatSidebar = ({
     hint: '↓ Click New Session to begin',
   };
 
-  // Filter by CATEGORY — shows all sessions from the same category group
+  // Filter by EXACT PERSONA ID — strict isolation
   const filters: ChannelFilters = {
     type: "messaging",
     members: { $in: [user.id] },
-    profileCategory: { $eq: activeProfile.category } as any,
+    profileId: { $eq: activeProfile.id } as any,
   };
   const sort: ChannelSort = { last_message_at: -1 };
   const options = { state: true, presence: true, limit: 30 };
 
-  const categoryLabel = CATEGORY_LABELS[activeProfile.category] || `${activeProfile.emoji} Sessions`;
+  const categoryLabel = `${activeProfile.emoji} ${activeProfile.name} Sessions`;
 
   const ChannelListEmptyStateIndicator = () => (
     <div className="flex flex-col items-center justify-center px-5 py-10 text-center">
@@ -114,14 +114,16 @@ export const ChatSidebar = ({
       )}
 
       <div className={cn(
-        "fixed lg:static inset-y-0 left-0 z-50 w-80 bg-background border-r flex flex-col transform transition-transform duration-300 ease-in-out",
-        isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        "fixed inset-y-0 left-0 z-50 bg-background border-r flex flex-col transform transition-transform duration-300 ease-in-out w-80",
+        isOpen ? "translate-x-0" : "-translate-x-full",
+        // Desktop overrides to let the parent Panel control the width
+        "lg:static lg:transform-none lg:w-full lg:h-full lg:translate-x-0"
       )}>
         {/* Sidebar Header — shows category label */}
-        <div className="p-4 border-b flex justify-between items-start">
-          <div>
-            <h2 className="text-sm font-bold text-foreground leading-tight">{categoryLabel}</h2>
-            <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+        <div className="p-4 border-b flex justify-between items-start min-w-0">
+          <div className="flex-1 min-w-0 pr-2">
+            <h2 className="text-sm font-bold text-foreground leading-tight truncate">{categoryLabel}</h2>
+            <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight truncate">
               {activeProfile.emoji} {activeProfile.name} · {activeProfile.tagline}
             </p>
           </div>
@@ -140,10 +142,6 @@ export const ChatSidebar = ({
               EmptyStateIndicator={ChannelListEmptyStateIndicator}
               Preview={(previewProps) => {
                 const channelData = previewProps.channel.data as any;
-                // Emoji trail: array of emojis used in this session
-                const usedEmojis: string[] = channelData?.usedProfileEmojis || [];
-                // Highlight emojis matching the currently active profile
-                const activeEmoji = activeProfile.emoji;
                 const isActiveInThisChannel = channelData?.profileId === activeProfile.id;
 
                 return (
@@ -165,29 +163,6 @@ export const ChatSidebar = ({
                     <span className="flex-1 truncate text-sm font-medium text-foreground">
                       {previewProps.channel.data?.name || `New ${activeProfile.name} Session`}
                     </span>
-
-                    {/* Right: emoji trail showing which personas were used */}
-                    {usedEmojis.length > 0 && (
-                      <div className="flex items-center gap-0.5 ml-2 shrink-0">
-                        {/* Deduplicate while preserving order */}
-                        {[...new Set(usedEmojis)].map((emoji, i) => (
-                          <span
-                            key={i}
-                            className={cn(
-                              "text-[13px] leading-none transition-all duration-200",
-                              emoji === activeEmoji && previewProps.active
-                                ? "opacity-100 scale-110 drop-shadow-sm"
-                                : emoji === activeEmoji
-                                  ? "opacity-90"
-                                  : "opacity-35 grayscale"
-                            )}
-                            title={emoji}
-                          >
-                            {emoji}
-                          </span>
-                        ))}
-                      </div>
-                    )}
 
                     {/* Delete button on hover */}
                     <Button
