@@ -86,3 +86,5 @@ jspm_packages/
 .Trashes
 ehthumbs.db
 Thumbs.db
+*.env.example
+*.env
