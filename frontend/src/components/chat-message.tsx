@@ -226,7 +226,7 @@ const ChatMessage: React.FC = () => {
   return (
     <div
       className={cn(
-        "flex w-full mb-4 px-4 group",
+        "flex w-full mb-4 px-4 group animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-300 ease-out",
         isUser ? "justify-end" : "justify-start"
       )}
     >

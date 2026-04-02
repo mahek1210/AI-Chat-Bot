@@ -206,7 +206,7 @@ const EmptyStateWithInput: React.FC<{
                       <button
                         key={promptIndex}
                         onClick={() => handlePromptClick(prompt)}
-                        className="p-3 text-left text-sm rounded-lg bg-muted/30 hover:bg-muted/50 transition-all duration-200 border border-muted/50 hover:border-muted group"
+                        className="p-3 text-left text-sm rounded-lg bg-muted/30 hover:bg-muted/50 transition-all duration-200 border border-muted/50 hover:border-primary/30 hover:shadow-md hover:-translate-y-0.5 group"
                       >
                         <span className="text-foreground group-hover:text-primary transition-colors">
                           {prompt}
@@ -222,7 +222,7 @@ const EmptyStateWithInput: React.FC<{
       </div>
 
       {/* Input Area */}
-      <div className="border-t bg-background/95 backdrop-blur-sm">
+      <div className="border-t border-border/50 bg-background/60 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 relative z-20">
         <div className="p-4">
           <ChatInput
             sendMessage={onNewChatMessage}
@@ -393,7 +393,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <ProfileSelectorDialog open={profileSelectorOpen} onOpenChange={setProfileSelectorOpen} />
 
       {/* Enhanced Header */}
-      <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur-sm z-10">
+      <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border/50 bg-background/60 backdrop-blur-xl z-10 sticky top-0 supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"

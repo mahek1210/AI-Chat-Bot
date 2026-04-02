@@ -1,0 +1,79 @@
+[
+  {
+    "Model": "claude-3.5-sonnet",
+    "WithoutTool": "FAILED ❌",
+    "WithoutToolError": "OpenRouter service error: 402 This request requires more credits, or fewer max_tokens. You requested up to 8192 tokens, but can only afford 1331. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account",
+    "WithTool": "FAILED ❌",
+    "WithToolError": "OpenRouter service error: 402 This request requires more credits, or fewer max_tokens. You requested up to 8192 tokens, but can only afford 1331. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account"
+  },
+  {
+    "Model": "llama-3.1-70b",
+    "WithoutTool": "FAILED ❌",
+    "WithoutToolError": "OpenRouter service error: 400 llama-3.1-70b is not a valid model ID",
+    "WithTool": "FAILED ❌",
+    "WithToolError": "OpenRouter service error: 400 llama-3.1-70b is not a valid model ID"
+  },
+  {
+    "Model": "nvidia/nemotron-3-super-120b-a12b:free",
+    "WithoutTool": "SUCCESS ✅",
+    "WithoutToolError": "",
+    "WithTool": "SUCCESS (Used Tool) ✅",
+    "WithToolError": ""
+  },
+  {
+    "Model": "qwen/qwen3-next-80b-a3b-instruct:free",
+    "WithoutTool": "SUCCESS ✅",
+    "WithoutToolError": "",
+    "WithTool": "UNSUPPORTED (Retried without tool) ⚠️",
+    "WithToolError": ""
+  },
+  {
+    "Model": "google/gemma-3n-e2b-it:free",
+    "WithoutTool": "SUCCESS ✅",
+    "WithoutToolError": "",
+    "WithTool": "UNSUPPORTED (Retried without tool) ⚠️",
+    "WithToolError": ""
+  },
+  {
+    "Model": "nousresearch/hermes-3-llama-3.1-405b:free",
+    "WithoutTool": "SUCCESS ✅",
+    "WithoutToolError": "",
+    "WithTool": "FAILED ❌",
+    "WithToolError": "OpenRouter service error: The user aborted a request."
+  },
+  {
+    "Model": "arcee-ai/maestro-reasoning",
+    "WithoutTool": "FAILED ❌",
+    "WithoutToolError": "OpenRouter service error: 402 This request requires more credits, or fewer max_tokens. You requested up to 32000 tokens, but can only afford 12105. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account",
+    "WithTool": "FAILED ❌",
+    "WithToolError": "OpenRouter service error: 402 This request requires more credits, or fewer max_tokens. You requested up to 32000 tokens, but can only afford 12105. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account"
+  },
+  {
+    "Model": "mistralai/mistral-small-3.1-24b-instruct:free",
+    "WithoutTool": "SUCCESS ✅",
+    "WithoutToolError": "",
+    "WithTool": "FAILED ❌",
+    "WithToolError": "OpenRouter service error: 402 Provider returned error"
+  },
+  {
+    "Model": "arcee-ai/trinity-large-preview:free",
+    "WithoutTool": "SUCCESS ✅",
+    "WithoutToolError": "",
+    "WithTool": "FAILED ❌",
+    "WithToolError": "OpenRouter service error: The user aborted a request."
+  },
+  {
+    "Model": "openrouter/auto",
+    "WithoutTool": "SUCCESS ✅",
+    "WithoutToolError": "",
+    "WithTool": "SUCCESS (Used Tool) ✅",
+    "WithToolError": ""
+  },
+  {
+    "Model": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    "WithoutTool": "SUCCESS ✅",
+    "WithoutToolError": "",
+    "WithTool": "FAILED ❌",
+    "WithToolError": "OpenRouter service error: The user aborted a request."
+  }
+]

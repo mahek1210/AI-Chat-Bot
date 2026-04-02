@@ -185,8 +185,11 @@ export const ChatSidebar = ({
         </ScrollArea>
 
         {/* New Session Button */}
-        <div className="p-3 border-t">
-          <Button onClick={onNewChat} className="w-full justify-start group relative overflow-hidden">
+        <div className="p-3 border-t bg-background/50 backdrop-blur-md">
+          <Button 
+            onClick={onNewChat} 
+            className="w-full justify-start group relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(var(--primary),0.2)] active:scale-[0.98]"
+          >
             <PlusCircle className="mr-2 h-4 w-4" />
             <span>New {activeProfile.name} Session</span>
             <span className="ml-auto text-base opacity-70 group-hover:opacity-100 transition-opacity">

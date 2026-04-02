@@ -219,6 +219,8 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
         totalTokens: 0,
       };
       let finalFallbackInfo: any = null;
+      let abortedDueToLength = false;
+      const MAX_STREAM_CHARS = 4800;
 
       // Handle multiple rounds of function calling
       let round = 0;
@@ -235,9 +237,18 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
           temperature: 0.7,
           abortSignal: abortController.signal,
           onChunk: (chunk: string) => {
+            if (abortedDueToLength) return;
+            
             streamedResponse += chunk;
+            
+            if (streamedResponse.length > MAX_STREAM_CHARS) {
+              abortedDueToLength = true;
+              abortController.abort();
+              streamedResponse = streamedResponse.substring(0, MAX_STREAM_CHARS) + "\n\n⚠️ **[Response truncated due to maximum character limit (5000 limit). Please ask me to continue if you want the rest of the answer.]**";
+            }
+
             const now = Date.now();
-            if (now - lastUpdateTs > 150) {
+            if (now - lastUpdateTs > 150 || abortedDueToLength) {
               lastUpdateTs = now;
               this.chatClient.partialUpdateMessage(channelMessage.id, {
                 set: { text: streamedResponse }
@@ -269,6 +280,12 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
         try {
           response = await this.aiRouter.routeRequest(llmRequest);
         } catch (err: any) {
+          if (abortedDueToLength) {
+            console.log('⚠️ Generation was aborted programmatically due to length limits.');
+            finalResponse = streamedResponse;
+            break;
+          }
+          
           if (
             err.name === 'AbortError' || 
             err.message?.includes('AbortError') || 
