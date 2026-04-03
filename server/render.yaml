@@ -2,23 +2,66 @@
 services:
   - type: web
     name: ai-chat-bot-backend
-    env: node
-    buildCommand: npm install && npm run build
-    startCommand: npm start
+    rootDir: server
+    runtime: node
+    plan: free
+    buildCommand: npm install --legacy-peer-deps && npm run build
+    startCommand: node dist/index.js
     envVars:
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_KEY
-        sync: false
-      - key: STREAM_API_KEY
-        sync: false
-      - key: STREAM_API_SECRET
-        sync: false
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: MONGODB_URI
-        sync: false
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
+      # Stream Chat
+      - key: STREAM_API_KEY
+        sync: false
+      - key: STREAM_API_SECRET
+        sync: false
+      # Supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      # AI Providers
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_REFERER
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_BASE_URL
+        value: https://api.anthropic.com
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: MISTRAL_BASE_URL
+        value: https://api.mistral.ai/v1
+      - key: MEM0_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      # Database / Cache
+      - key: MONGO_URI
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: MEMORY_SHORT_LIMIT
+        value: "20"
+      # JWT Auth
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: JWT_ACCESS_EXPIRES
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES
+        value: 7d
+      - key: BCRYPT_SALT_ROUNDS
+        value: "10"
