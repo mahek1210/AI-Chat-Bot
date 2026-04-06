@@ -179,6 +179,55 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
       throw new Error("Model is required but not provided in request or agent configuration");
     }
 
+    // ── TEMPORAL CLASSIFIER ─────────────────────────────────────────────────
+    // Classify the query BEFORE any AI call so we can pre-fetch fresh data
+    // for time-sensitive questions and inject it as ground-truth context.
+    const queryType = this.classifyQuery(message);
+    console.log(`🕐 Temporal Classifier: "${message.substring(0, 60)}..." → ${queryType}`);
+
+    let proactiveSearchResult: string | null = null;
+    if (queryType === 'TIME_SENSITIVE') {
+
+      // FIX 2 — Skip Tavily for pure date/time questions.
+      // The date is already injected into the system prompt via new Date(),
+      // so a web search would be wasteful and return irrelevant results.
+      const pureDatePatterns = [
+        /^what(?:'s| is) today(?:'s date)?[?!.]?$/,
+        /^what(?:'s| is) the date(?: today)?[?!.]?$/,
+        /^what day is it[?!.]?$/,
+        /^what(?:'s| is) the (current )?date[?!.]?$/,
+        /^what(?:'s| is) (the )?time[?!.]?$/,
+        /^what time is it[?!.]?$/,
+        /^tell me (today's date|the date|the time)[?!.]?$/,
+        /^(today's date|current date|current time)[?!.]?$/,
+      ];
+      const isPureDateQuestion = pureDatePatterns.some(p => p.test(message.toLowerCase().trim()));
+
+      if (isPureDateQuestion) {
+        console.log(`📅 Pure date/time question detected — skipping Tavily, date is already in system prompt`);
+      } else {
+        // FIX 1 — Enrich the Tavily query with today's date so results are
+        // anchored to now and Tavily doesn't return outdated content.
+        const now = new Date();
+        const dateLabel = now.toLocaleDateString('en-US', {
+          month: 'long', day: 'numeric', year: 'numeric'   // e.g. "April 6, 2026"
+        });
+        const enrichedQuery = `${message} ${dateLabel}`;
+        console.log(`🔍 TIME_SENSITIVE — enriched Tavily query: "${enrichedQuery}"`);
+
+        const rawSearchResult = await this.performWebSearch(enrichedQuery);
+        // FIX 3: If Tavily returns an error payload, suppress it entirely.
+        // Do NOT inject error JSON into the AI context — the AI responds from training data instead.
+        if (!rawSearchResult.includes('"error"')) {
+          proactiveSearchResult = rawSearchResult;
+          console.log(`✅ Tavily search successful — injecting results into context`);
+        } else {
+          console.log(`⚠️ Tavily search returned an error payload — skipping injection, AI will use training data`);
+        }
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     // Auto-generate a title if the channel doesn't have a specific name
     if (!this.channel.data?.name || this.channel.data.name.includes("!members")) {
       this.generateAndSetChannelTitle(message).catch(e => console.error("Title generation failed:", e));
@@ -205,9 +254,25 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
     };
     this.chatClient.on("ai_indicator.stop", handleStop);
 
+    // FIX 4: Merge search results INTO the single system message (not a separate
+    // second system message). This avoids dual-system-message issues with
+    // Gemini and Claude adapters that don't support consecutive system roles.
+    let requestSystemPrompt = systemPrompt;
+    if (proactiveSearchResult) {
+      requestSystemPrompt =
+        `IMPORTANT INSTRUCTION FOR THIS RESPONSE ONLY: Fresh live web search ` +
+        `results are appended at the end of this system message. These results ` +
+        `are your ground truth for this response. Do NOT rely on your training ` +
+        `knowledge where it conflicts with the search results — ALWAYS prefer ` +
+        `the search results over your training data.\n\n` +
+        systemPrompt +
+        `\n\n[LIVE WEB SEARCH RESULTS — retrieved ${new Date().toUTCString()}]:\n${proactiveSearchResult}`;
+    }
+
     try {
+      // Single system message always — search results are embedded inside it when present.
       const messages: LLMMessage[] = [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: requestSystemPrompt },
         ...historyMessages,
         { role: 'user', content: message }
       ];
@@ -480,6 +545,109 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
     } finally {
       this.chatClient.off("ai_indicator.stop", handleStop);
     }
+  };
+
+  /**
+   * TEMPORAL CLASSIFIER
+   *
+   * Categorises a user message into one of three types:
+   *   TIMELESS       — answer never changes (math, writing, history with year, code)
+   *   SLOW_CHANGE    — answer changes over months/years (CEO, population, laws)
+   *   TIME_SENSITIVE — answer requires up-to-date knowledge
+   *
+   * CHECK ORDER (FIX 1):
+   *   1. TIME_SENSITIVE keywords  — checked FIRST, wins immediately
+   *   2. TIME_SENSITIVE phrases   — checked SECOND
+   *   3. TIMELESS patterns        — only reached when ZERO time-sensitive signals found
+   *   4. SLOW_CHANGE / DEFAULT    — last resort
+   *
+   * This order ensures messages like "write me a poem about today's weather"
+   * correctly return TIME_SENSITIVE instead of being short-circuited by "write".
+   */
+  private classifyQuery = (message: string): 'TIMELESS' | 'SLOW_CHANGE' | 'TIME_SENSITIVE' => {
+    const q = message.toLowerCase().trim();
+
+    // ── STEP 1: TIME_SENSITIVE keywords (checked FIRST) ───────────────────
+    // FIX 2: Expanded list with previously missing temporal phrases.
+    const timeSensitiveKeywords = [
+      // Explicit time references
+      'today', 'yesterday', 'right now', 'currently', 'at the moment',
+      'this week', 'this month', 'this year', 'this season',
+      'this morning', 'last night', 'last week', 'just now',
+      'earlier today', 'few hours ago', 'few days ago', 'past week',
+      // Recent-event phrases
+      'recently happened', 'did india win', 'did they win', 'did we win',
+      'latest', 'recent', 'just happened', 'just announced', 'just released',
+      'breaking', 'live', 'live score', 'live result',
+      // News & status
+      'news', 'update', 'announcement', 'press release',
+      // Sports
+      'score', 'result', 'match', 'fixture', 'standings', 'leaderboard',
+      'tournament', 'championship', 'playoff', 'final', 'semifinal',
+      'ipl', 'nba', 'nfl', 'epl', 'premier league', 'world cup', 'copa',
+      // Politics
+      'election', 'vote', 'poll', 'referendum',
+      // Finance
+      'stock', 'share price', 'crypto', 'bitcoin', 'ethereum', 'market',
+      // Weather
+      'weather', 'forecast', 'temperature', 'rain',
+      // Product / launch
+      'release date', 'launched', 'available now',
+      // Health
+      'covid', 'pandemic', 'outbreak',
+    ];
+    if (timeSensitiveKeywords.some(kw => q.includes(kw))) {
+      return 'TIME_SENSITIVE';
+    }
+
+    // ── STEP 2: TIME_SENSITIVE phrase patterns ────────────────────────────
+    const timeSensitivePatterns = [
+      /\b(who (won|is winning|leads|is ahead))\b/,
+      /\b(what (is the (current|latest|new)|happened|are the results?))\b/,
+      /\b(is .{1,40} still\b)/,              // "is X still happening / open / alive"
+      /\b(how did .{1,40}(perform|do|play|end))\b/,
+      /\b(what is .{1,30}(price|rate|value|cost) (of|for|today))\b/,
+      /\b(when (does|did|will) .{1,40}(open|close|start|end|launch|release))\b/,
+      /\b(who is (the )?(current|new|incoming|outgoing) (ceo|president|prime minister|chancellor|manager|coach|caption|leader|head))\b/,
+      /\b(what (happened|is happening) (in|at|with|to))\b/,
+      /\b(any (news|update|announcement|statement) (about|on|from|regarding))\b/,
+    ];
+    if (timeSensitivePatterns.some(p => p.test(q))) {
+      return 'TIME_SENSITIVE';
+    }
+
+    // ── STEP 3: Hard TIMELESS patterns ───────────────────────────────────
+    // Only reached when ZERO time-sensitive signals were found above.
+    // Catches: math, writing tasks, coding, definitions, historical facts with year.
+    const timelessPatterns = [
+      /\b(\d+\s*[+\-*/^%]\s*\d+)/,            // arithmetic expression
+      /\b(calculate|compute|solve|simplify|integrate|differentiate|prove|derive)\b/,
+      /\b(write|draft|compose|rewrite|edit|summarize|paraphrase|translate|proofread)\b/,
+      /\b(what is the (definition|meaning|concept|formula|syntax) of)\b/,
+      /\b(explain|describe|how does|why does|what is|what are)\b.{0,30}\b(algorithm|function|method|syntax|pattern|concept|principle)\b/,
+      /\b(in \d{4}|during (the )?(1\d{3}|20[0-1]\d)|\d{4} (war|revolution|election|treaty))\b/,
+      /\b(code|debug|fix|refactor|implement|function|class|variable|loop|array|object|string|regex|sql|query|api|endpoint)\b/,
+      /\b(grammar|spelling|punctuation|essay|paragraph|sentence|word|synonym|antonym)\b/,
+      /\b(recipe|ingredient|cook|bake|how to make)\b/,
+      /\b(convert|km to miles|celsius to fahrenheit|bytes? to|unit conversion)\b/,
+    ];
+    if (timelessPatterns.some(p => p.test(q))) {
+      return 'TIMELESS';
+    }
+
+    // ── STEP 4: SLOW_CHANGE heuristics ───────────────────────────────────
+    // Things that change but not hourly — classified as TIMELESS for now.
+    const slowChangePatterns = [
+      /\b(population of|gdp of|capital (city )?of|currency of)\b/,
+      /\b(who (founded|created|invented|started)|when was .{1,40}founded)\b/,
+      /\b(headquarters of|office of)\b/,
+    ];
+    if (slowChangePatterns.some(p => p.test(q))) {
+      return 'SLOW_CHANGE';
+    }
+
+    // Default: treat as TIMELESS (err on the side of not over-searching)
+    return 'TIMELESS';
   };
 
   private performWebSearch = async (query: string): Promise<string> => {
