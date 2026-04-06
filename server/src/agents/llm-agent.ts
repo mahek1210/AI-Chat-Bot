@@ -231,30 +231,37 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
       const startedAt = Date.now();
       while (round < maxRounds) {
         streamedResponse = ''; // Reset for this round
+
+        // The streaming callback — only used on round 0 (direct response).
+        // On tool-call follow-up rounds we disable streaming to avoid sending
+        // partial intermediate text to the UI.
+        const onChunkHandler = round === 0 ? (chunk: string) => {
+          if (abortedDueToLength) return;
+          
+          streamedResponse += chunk;
+          
+          if (streamedResponse.length > MAX_STREAM_CHARS) {
+            abortedDueToLength = true;
+            abortController.abort();
+            streamedResponse = streamedResponse.substring(0, MAX_STREAM_CHARS) + "\n\n⚠️ **[Response truncated due to maximum character limit (5000 limit). Please ask me to continue if you want the rest of the answer.]**";
+          }
+
+          const now = Date.now();
+          if (now - lastUpdateTs > 150 || abortedDueToLength) {
+            lastUpdateTs = now;
+            this.chatClient.partialUpdateMessage(channelMessage.id, {
+              set: { text: streamedResponse }
+            }).catch(e => console.warn("Stream update error:", e.message));
+          }
+        } : undefined;
+
         const llmRequest: LLMRequest = {
           messages,
           model,
           temperature: 0.7,
           abortSignal: abortController.signal,
-          onChunk: (chunk: string) => {
-            if (abortedDueToLength) return;
-            
-            streamedResponse += chunk;
-            
-            if (streamedResponse.length > MAX_STREAM_CHARS) {
-              abortedDueToLength = true;
-              abortController.abort();
-              streamedResponse = streamedResponse.substring(0, MAX_STREAM_CHARS) + "\n\n⚠️ **[Response truncated due to maximum character limit (5000 limit). Please ask me to continue if you want the rest of the answer.]**";
-            }
-
-            const now = Date.now();
-            if (now - lastUpdateTs > 150 || abortedDueToLength) {
-              lastUpdateTs = now;
-              this.chatClient.partialUpdateMessage(channelMessage.id, {
-                set: { text: streamedResponse }
-              }).catch(e => console.warn("Stream update error:", e.message));
-            }
-          },
+          onChunk: onChunkHandler,
+          // Only offer tools on the first round; subsequent rounds process results
           tools: round === 0 ? [
             {
               type: "function",
@@ -318,10 +325,21 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
             message_id: channelMessage.id,
           });
 
-          // Add the assistant's message with tool calls
-          messages.push({
+          // CRITICAL FIX: Push the assistant message WITH tool_calls attached.
+          // Without this, the next LLM call receives an assistant turn with no
+          // content AND no tool_calls — triggering "model output must contain
+          // either output text or tool calls" from OpenAI / Claude / Gemini.
+          (messages as any[]).push({
             role: 'assistant',
-            content: response.content,
+            content: response.content || null,
+            tool_calls: response.toolCalls.map(tc => ({
+              id: tc.id,
+              type: tc.type,
+              function: {
+                name: tc.function.name,
+                arguments: tc.function.arguments,
+              },
+            })),
           });
 
           // Handle each tool call
@@ -330,20 +348,18 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
               try {
                 const args = JSON.parse(toolCall.function.arguments);
                 const searchResult = await this.performWebSearch(args.query);
-                
-                                 // Add the tool result to messages
-                 messages.push({
-                   role: 'tool',
-                   content: searchResult,
-                   tool_call_id: toolCall.id,
-                 });
+                messages.push({
+                  role: 'tool',
+                  content: searchResult,
+                  tool_call_id: toolCall.id,
+                });
               } catch (error) {
                 console.error('Error handling web search tool call:', error);
-                                 messages.push({
-                   role: 'tool',
-                   content: JSON.stringify({ error: 'Failed to perform web search' }),
-                   tool_call_id: toolCall.id,
-                 });
+                messages.push({
+                  role: 'tool',
+                  content: JSON.stringify({ error: 'Failed to perform web search' }),
+                  tool_call_id: toolCall.id,
+                });
               }
             }
           }
@@ -352,9 +368,14 @@ Your goal is to provide accurate, current, and helpful written content. Failure 
           continue;
         }
 
-        // No tool calls, this is the final response
-        finalResponse = response.content;
+        // No tool calls — this is the final text response
+        finalResponse = response.content || streamedResponse;
         break;
+      }
+
+      // If we exhausted all rounds (e.g. 3 tool call turns with no text reply), use last streamed text
+      if (!finalResponse && streamedResponse) {
+        finalResponse = streamedResponse;
       }
 
       // Compute latency

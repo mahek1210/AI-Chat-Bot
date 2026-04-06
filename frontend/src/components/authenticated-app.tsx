@@ -104,11 +104,19 @@ const AuthenticatedCore = ({ user, onLogout, onDeleteAccount }: AuthenticatedApp
       });
       await newChannel.watch();
 
-      // 2. Set up event listener for when AI agent is added as member
-      const memberAddedPromise = new Promise<void>((resolve) => {
+      // 2. Set up event listener for when AI agent is added as member.
+      //    Include a 15-second timeout so we never hang indefinitely if the
+      //    agent fails to connect (e.g. backend crash or persona switch race).
+      const memberAddedPromise = new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          unsubscribe.unsubscribe();
+          reject(new Error("Timed out waiting for AI agent to join the channel. Please try again."));
+        }, 15000);
+
         const unsubscribe = newChannel.on("member.added", (event) => {
           // Check if the added member is the AI agent (not the current user)
           if (event.member?.user?.id && event.member.user.id !== user.id) {
+            clearTimeout(timeout);
             unsubscribe.unsubscribe();
             resolve();
           }
