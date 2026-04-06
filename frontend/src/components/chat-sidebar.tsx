@@ -139,6 +139,7 @@ export const ChatSidebar = ({
               filters={filters}
               sort={sort}
               options={options}
+              setActiveChannelOnMount={false}
               EmptyStateIndicator={ChannelListEmptyStateIndicator}
               Preview={(previewProps) => {
                 const channelData = previewProps.channel.data as any;

@@ -65,7 +65,7 @@ const AuthenticatedCore = ({ user, onLogout, onDeleteAccount }: AuthenticatedApp
   useEffect(() => {
     if (categoryChanged) {
       setActiveChannel(undefined);
-      navigate('/');
+      navigate('/chat');
     }
   }, [categoryChanged]);
 
@@ -163,7 +163,7 @@ const AuthenticatedCore = ({ user, onLogout, onDeleteAccount }: AuthenticatedApp
 
   const handleNewChatClick = () => {
     setActiveChannel(undefined);
-    navigate("/");
+    navigate("/chat");
     setSidebarOpen(false);
   };
 
